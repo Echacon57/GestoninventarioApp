@@ -1,0 +1,14 @@
+# Para la(s) computadora(s) que SOLO consultan el inventario (visor.py).
+# No necesitan nada de este archivo: visor.py solo usa la libreria estandar
+# de Python (incluido tkinter, que ya viene con la instalacion normal de
+# Python en Windows y Mac; en Linux instala el paquete "python3-tk").
+#
+# Este archivo esta vacio a proposito: es para dejar constancia de que no
+# hace falta correr pip install en esa computadora, no para ejecutarlo.
+#
+# Excepcion: el boton "Exportar" del visor genera CSV siempre (no necesita
+# nada extra), pero el reporte en Excel si necesita estas dos librerias
+# instaladas en ESA computadora. Si no las tiene, el CSV se genera igual y
+# el Excel se salta con un aviso claro, sin errores feos. Si quieres el
+# Excel tambien ahi, instala:
+#   pip install pandas openpyxl

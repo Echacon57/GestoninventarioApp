@@ -1,0 +1,77 @@
+# ---------------------------------------------------------------
+# Datos locales del sistema (base de datos, respaldos y rutas)
+# ---------------------------------------------------------------
+# La base se crea sola al abrir el programa; no debe versionarse.
+datos/
+datos_visor/
+
+# Etiquetas generadas para imprimir
+etiquetas/
+
+# Cualquier base SQLite suelta
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Reportes y exportaciones generadas
+*.xlsx
+*.xls
+!ejemplo_*.xlsx
+
+# ---------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Entornos virtuales
+.venv/
+venv/
+env/
+ENV/
+.env
+
+# Empaquetado (PyInstaller, setuptools)
+build/
+dist/
+*.egg-info/
+.eggs/
+*.manifest
+
+# Pruebas y cobertura
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Logs
+*.log
+
+# ---------------------------------------------------------------
+# Editores e IDEs
+# ---------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*~
+
+# Claude Code (configuración local)
+.claude/settings.local.json
+
+# ---------------------------------------------------------------
+# Sistema operativo
+# ---------------------------------------------------------------
+Thumbs.db
+desktop.ini
+ehthumbs.db
+$RECYCLE.BIN/
+.DS_Store
+
+# Archivos temporales de Office (~$archivo.xlsx)
+~$*

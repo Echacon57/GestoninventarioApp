@@ -1,0 +1,4 @@
+python-barcode>=0.15
+pandas
+openpyxl
+Pillow>=10.0
