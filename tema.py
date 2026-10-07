@@ -41,7 +41,7 @@ PALETAS = {
         "ROJO": "#b23a3a",
         "AMBAR": "#84621f",
         "AZUL": "#2f5d8a",
-        "CYAN": "#2a707c",
+        "CYAN": "#3a4254",
         "TXT_OK": "#7fd6a0",
         "TXT_AVISO": "#e6b85c",
         "TXT_ERROR": "#f28b82",
@@ -49,9 +49,7 @@ PALETAS = {
         "TXT_ENTRADA": "#7fd6a0",
         "TXT_BAJA": "#6b7285",
     },
-    # Aqui los colores fuertes sirven igual como fondo de boton (con texto
-    # blanco) y como texto sobre blanco, asi que TXT_OK/AVISO/ERROR repiten
-    # VERDE/AMBAR/ROJO.
+
     "claro": {
         "FONDO": "#eef1f6",
         "PANEL": "#ffffff",
@@ -74,7 +72,6 @@ PALETAS = {
 }
 TEMA_POR_DEFECTO = "oscuro"
 
-# Se rellenan en aplicar_tema(); quedan declarados para los editores.
 ACTUAL = TEMA_POR_DEFECTO
 FONDO = PANEL = CAMPO = TEXTO = SUAVE = SOBRE_COLOR = ""
 VERDE = ROJO = AMBAR = AZUL = CYAN = ""
