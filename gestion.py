@@ -25,7 +25,6 @@ import inventario
 import snapshot
 import tema
 from inventario import fmt
-from tema import AMBAR, AZUL, CAMPO, FONDO, PANEL, ROJO, SUAVE, TEXTO, VERDE, CYAN
 
 
 def _imprimir(elementos: list[dict], nombre: str, ventana) -> None:
@@ -46,7 +45,7 @@ def _imprimir(elementos: list[dict], nombre: str, ventana) -> None:
 
 class FichaArticulos(tk.Frame):
     def __init__(self, padre, con, al_cambiar=None):
-        super().__init__(padre, bg=FONDO)
+        super().__init__(padre, bg=tema.FONDO)
         self.con = con
         self.al_cambiar = al_cambiar
         self.codigo_actual: str | None = None
@@ -61,12 +60,12 @@ class FichaArticulos(tk.Frame):
         self.rowconfigure(0, weight=1)
 
         # ---- izquierda: buscador y lista
-        izq = tk.Frame(self, bg=FONDO)
+        izq = tk.Frame(self, bg=tema.FONDO)
         izq.grid(row=0, column=0, sticky="nsew", padx=(14, 8), pady=14)
         izq.rowconfigure(2, weight=1)
         izq.columnconfigure(0, weight=1)
 
-        barra = tk.Frame(izq, bg=FONDO)
+        barra = tk.Frame(izq, bg=tema.FONDO)
         barra.grid(row=0, column=0, columnspan=2, sticky="ew")
         tema.titulo(barra, "Buscar").pack(side="left", padx=(0, 8))
         self.busqueda = tk.StringVar()
@@ -74,19 +73,19 @@ class FichaArticulos(tk.Frame):
         caja = tema.entrada(barra, textvariable=self.busqueda)
         caja.pack(side="left", fill="x", expand=True, ipady=4)
 
-        fila_filtros = tk.Frame(izq, bg=FONDO)
+        fila_filtros = tk.Frame(izq, bg=tema.FONDO)
         fila_filtros.grid(row=1, column=0, columnspan=2, sticky="ew",
                           pady=(6, 4))
 
         self.ver_bajas = tk.BooleanVar(value=False)
         tk.Checkbutton(fila_filtros, text="Mostrar tambien los dados de baja",
                        variable=self.ver_bajas, command=self.refrescar,
-                       bg=FONDO, fg=SUAVE, selectcolor=PANEL, bd=0,
-                       activebackground=FONDO, activeforeground=TEXTO,
+                       bg=tema.FONDO, fg=tema.SUAVE, selectcolor=tema.PANEL, bd=0,
+                       activebackground=tema.FONDO, activeforeground=tema.TEXTO,
                        font=("Segoe UI", 9), highlightthickness=0
                        ).pack(side="left")
 
-        tk.Label(fila_filtros, text="Estado:", bg=FONDO, fg=SUAVE,
+        tk.Label(fila_filtros, text="Estado:", bg=tema.FONDO, fg=tema.SUAVE,
                  font=("Segoe UI", 9)).pack(side="left", padx=(18, 4))
         self.filtro_estado = ttk.Combobox(
             fila_filtros, state="readonly", width=16, font=("Segoe UI", 9),
@@ -96,7 +95,7 @@ class FichaArticulos(tk.Frame):
         self.filtro_estado.bind("<<ComboboxSelected>>",
                                 lambda e: self.refrescar())
 
-        tk.Label(fila_filtros, text="Ubicacion:", bg=FONDO, fg=SUAVE,
+        tk.Label(fila_filtros, text="Ubicacion:", bg=tema.FONDO, fg=tema.SUAVE,
                  font=("Segoe UI", 9)).pack(side="left", padx=(12, 4))
         self.filtro_ubicacion = ttk.Combobox(
             fila_filtros, state="readonly", width=16, font=("Segoe UI", 9),
@@ -124,30 +123,30 @@ class FichaArticulos(tk.Frame):
         barra_v.grid(row=2, column=1, sticky="ns")
         self.tabla.configure(yscrollcommand=barra_v.set)
         self.tabla.bind("<<TreeviewSelect>>", self._al_seleccionar)
-        self.tabla.tag_configure("baja", foreground="#6b7285")
-        self.tabla.tag_configure("fuera", foreground="#f0a868")
+        self.tabla.tag_configure("baja", foreground=tema.TXT_BAJA)
+        self.tabla.tag_configure("fuera", foreground=tema.TXT_SALIDA)
 
-        barra_inf = tk.Frame(izq, bg=FONDO)
+        barra_inf = tk.Frame(izq, bg=tema.FONDO)
         barra_inf.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(8, 0))
         tema.boton(barra_inf, "Imprimir etiquetas de la lista",
                    self.imprimir_lista).pack(side="left")
-        self.conteo = tk.Label(barra_inf, text="", bg=FONDO, fg=SUAVE,
+        self.conteo = tk.Label(barra_inf, text="", bg=tema.FONDO, fg=tema.SUAVE,
                                font=("Segoe UI", 9))
         self.conteo.pack(side="right")
 
         # ---- formulario nuevo articulo
-        contenedor_der, self.der = tema.marco_desplazable(self, PANEL)
+        contenedor_der, self.der = tema.marco_desplazable(self, tema.PANEL)
         contenedor_der.grid(row=0, column=1, sticky="nsew", padx=(8, 14),
                             pady=14)
         self.der.columnconfigure(1, weight=1)
 
-        self.encabezado = tk.Label(self.der, text="Nuevo articulo", bg=PANEL,
-                                   fg=TEXTO, font=("Segoe UI", 15, "bold"),
+        self.encabezado = tk.Label(self.der, text="Nuevo articulo", bg=tema.PANEL,
+                                   fg=tema.TEXTO, font=("Segoe UI", 15, "bold"),
                                    anchor="w")
         self.encabezado.grid(row=0, column=0, columnspan=2, sticky="ew",
                              padx=16, pady=(16, 2))
         self.lbl_codigo = tk.Label(self.der, text="El codigo se asigna solo",
-                                   bg=PANEL, fg=SUAVE,
+                                   bg=tema.PANEL, fg=tema.SUAVE,
                                    font=("Consolas", 11), anchor="w")
         self.lbl_codigo.grid(row=1, column=0, columnspan=2, sticky="ew",
                              padx=16, pady=(0, 10))
@@ -155,18 +154,18 @@ class FichaArticulos(tk.Frame):
         fila = 2
         self.nombre = self._campo("Nombre", fila); fila += 1
 
-        tk.Label(self.der, text="Tipo", bg=PANEL, fg=SUAVE,
+        tk.Label(self.der, text="Tipo", bg=tema.PANEL, fg=tema.SUAVE,
                  font=("Segoe UI", 9, "bold")).grid(row=fila, column=0,
                                                     sticky="w", padx=16)
         self.tipo = tk.StringVar(value="UNICO")
-        marco_tipo = tk.Frame(self.der, bg=PANEL)
+        marco_tipo = tk.Frame(self.der, bg=tema.PANEL)
         marco_tipo.grid(row=fila, column=1, sticky="w", padx=(0, 16), pady=3)
         for valor, texto in (("UNICO", "Herramienta (pieza unica)"),
                              ("CONSUMIBLE", "Material (con cantidad)")):
             tk.Radiobutton(marco_tipo, text=texto, value=valor,
                            variable=self.tipo, command=self._ajustar_tipo,
-                           bg=PANEL, fg=TEXTO, selectcolor=CAMPO, bd=0,
-                           activebackground=PANEL, activeforeground=TEXTO,
+                           bg=tema.PANEL, fg=tema.TEXTO, selectcolor=tema.CAMPO, bd=0,
+                           activebackground=tema.PANEL, activeforeground=tema.TEXTO,
                            font=("Segoe UI", 10), highlightthickness=0,
                            anchor="w").pack(anchor="w")
         fila += 1
@@ -182,45 +181,45 @@ class FichaArticulos(tk.Frame):
         self.numero_serie, self.valor_unitario = self._campo_doble(
             "N. de serie", "Valor unitario ($)", fila); fila += 1
 
-        tk.Label(self.der, text="Notas", bg=PANEL, fg=SUAVE,
+        tk.Label(self.der, text="Notas", bg=tema.PANEL, fg=tema.SUAVE,
                  font=("Segoe UI", 9, "bold")).grid(row=fila, column=0,
                                                     sticky="nw", padx=16,
                                                     pady=(6, 0))
-        self.notas = tk.Text(self.der, height=3, width=26, bg=CAMPO, fg=TEXTO, bd=0,
-                             insertbackground=TEXTO, font=("Segoe UI", 10),
+        self.notas = tk.Text(self.der, height=3, width=26, bg=tema.CAMPO, fg=tema.TEXTO, bd=0,
+                             insertbackground=tema.TEXTO, font=("Segoe UI", 10),
                              relief="flat", wrap="word")
         self.notas.grid(row=fila, column=1, sticky="ew", padx=(0, 16), pady=6)
         fila += 1
 
-        self.aviso = tk.Label(self.der, text="", bg=PANEL, fg=AMBAR,
+        self.aviso = tk.Label(self.der, text="", bg=tema.PANEL, fg=tema.TXT_AVISO,
                               font=("Segoe UI", 9), anchor="w", wraplength=300,
                               justify="left")
         self.aviso.grid(row=fila, column=0, columnspan=2, sticky="ew",
                         padx=16, pady=(4, 0))
         fila += 1
 
-        botones = tk.Frame(self.der, bg=PANEL)
+        botones = tk.Frame(self.der, bg=tema.PANEL)
         botones.grid(row=fila, column=0, columnspan=2, sticky="ew",
                      padx=16, pady=14)
-        self.btn_guardar = tema.boton(botones, "Guardar", self.guardar, VERDE)
+        self.btn_guardar = tema.boton(botones, "Guardar", self.guardar, tema.VERDE)
         self.btn_guardar.pack(side="left")
 
         #tema.boton(botones, "Nuevo", self.limpiar).pack(side="left", padx=6)
 
-        self.btn_nuevo = tema.boton(botones, "Nuevo", self.limpiar, CYAN)
+        self.btn_nuevo = tema.boton(botones, "Nuevo", self.limpiar, tema.CYAN)
         self.btn_nuevo.pack(side="left")
 
-        self.btn_baja = tema.boton(botones, "Dar de baja", self.dar_baja, ROJO)
+        self.btn_baja = tema.boton(botones, "Dar de baja", self.dar_baja, tema.ROJO)
         self.btn_baja.pack(side="left")
         fila += 1
 
         self.btn_etiqueta = tema.boton(self.der, "Imprimir esta etiqueta",
-                                       self.imprimir_actual, CYAN)
+                                       self.imprimir_actual, tema.CYAN)
         self.btn_etiqueta.grid(row=fila, column=0, columnspan=2, sticky="w",
                                padx=16, pady=(0, 16))
 
     def _campo(self, etiqueta: str, fila: int) -> tk.Entry:
-        tk.Label(self.der, text=etiqueta, bg=PANEL, fg=SUAVE,
+        tk.Label(self.der, text=etiqueta, bg=tema.PANEL, fg=tema.SUAVE,
                  font=("Segoe UI", 9, "bold")).grid(row=fila, column=0,
                                                     sticky="w", padx=16)
         campo = tema.entrada(self.der)
@@ -231,22 +230,22 @@ class FichaArticulos(tk.Frame):
     def _campo_doble(self, etiqueta_izq: str, etiqueta_der: str,
                      fila: int) -> tuple[tk.Entry, tk.Entry]:
         """Dos campos cortos en la misma fila, para no alargar el formulario."""
-        marco = tk.Frame(self.der, bg=PANEL)
+        marco = tk.Frame(self.der, bg=tema.PANEL)
         marco.grid(row=fila, column=0, columnspan=2, sticky="ew",
                    padx=16, pady=3)
         marco.columnconfigure(0, weight=1)
         marco.columnconfigure(1, weight=1)
 
-        sub_izq = tk.Frame(marco, bg=PANEL)
+        sub_izq = tk.Frame(marco, bg=tema.PANEL)
         sub_izq.grid(row=0, column=0, sticky="ew", padx=(0, 6))
-        tk.Label(sub_izq, text=etiqueta_izq, bg=PANEL, fg=SUAVE,
+        tk.Label(sub_izq, text=etiqueta_izq, bg=tema.PANEL, fg=tema.SUAVE,
                  font=("Segoe UI", 9, "bold")).pack(anchor="w")
         campo_izq = tema.entrada(sub_izq)
         campo_izq.pack(fill="x", ipady=3)
 
-        sub_der = tk.Frame(marco, bg=PANEL)
+        sub_der = tk.Frame(marco, bg=tema.PANEL)
         sub_der.grid(row=0, column=1, sticky="ew", padx=(6, 0))
-        tk.Label(sub_der, text=etiqueta_der, bg=PANEL, fg=SUAVE,
+        tk.Label(sub_der, text=etiqueta_der, bg=tema.PANEL, fg=tema.SUAVE,
                  font=("Segoe UI", 9, "bold")).pack(anchor="w")
         campo_der = tema.entrada(sub_der)
         campo_der.pack(fill="x", ipady=3)
@@ -254,7 +253,7 @@ class FichaArticulos(tk.Frame):
         return campo_izq, campo_der
 
     def _combo(self, etiqueta: str, fila: int) -> ttk.Combobox:
-        tk.Label(self.der, text=etiqueta, bg=PANEL, fg=SUAVE,
+        tk.Label(self.der, text=etiqueta, bg=tema.PANEL, fg=tema.SUAVE,
                  font=("Segoe UI", 9, "bold")).grid(row=fila, column=0,
                                                     sticky="w", padx=16)
         combo = ttk.Combobox(self.der, font=("Segoe UI", 11))
@@ -320,7 +319,7 @@ class FichaArticulos(tk.Frame):
             return
         self.codigo_actual = art["codigo"]
         self.encabezado.config(text=art["nombre"][:34])
-        self.lbl_codigo.config(text=art["codigo"], fg=TEXTO)
+        self.lbl_codigo.config(text=art["codigo"], fg=tema.TEXTO)
 
         self._poner(self.nombre, art["nombre"])
         self.tipo.set(art["tipo"])
@@ -338,7 +337,7 @@ class FichaArticulos(tk.Frame):
 
         activo = bool(art["activo"])
         self.btn_baja.config(text="Dar de baja" if activo else "Reactivar",
-                             bg=ROJO if activo else VERDE)
+                             bg=tema.ROJO if activo else tema.VERDE)
         self.aviso.config(
             text="" if activo else "Este articulo esta dado de baja: el "
                                    "escaner lo rechaza hasta que lo reactives.")
@@ -349,7 +348,7 @@ class FichaArticulos(tk.Frame):
         self.tabla.selection_remove(*self.tabla.selection())
         self.encabezado.config(text="Nuevo articulo")
         self.lbl_codigo.config(text="El codigo se asigna solo al guardar",
-                               fg=SUAVE)
+                               fg=tema.SUAVE)
         for campo in (self.nombre, self.unidad, self.existencia, self.minimo,
                      self.marca, self.modelo, self.numero_serie,
                      self.valor_unitario):
@@ -362,7 +361,7 @@ class FichaArticulos(tk.Frame):
         self._poner(self.minimo, "0")
         self._poner(self.valor_unitario, "0")
         self.notas.delete("1.0", "end")
-        self.btn_baja.config(text="Dar de baja", bg=ROJO)
+        self.btn_baja.config(text="Dar de baja", bg=tema.ROJO)
         self.aviso.config(text="")
         self._ajustar_tipo()
         self.nombre.focus_set()
@@ -393,7 +392,7 @@ class FichaArticulos(tk.Frame):
         estado = "normal" if es_consumible else "disabled"
         for campo in (self.unidad, self.existencia, self.minimo):
             campo.config(state=estado,
-                         disabledbackground=PANEL, disabledforeground=SUAVE)
+                         disabledbackground=tema.PANEL, disabledforeground=tema.SUAVE)
         if not es_consumible and self.codigo_actual is None:
             for campo, valor in ((self.unidad, "pza"), (self.existencia, "1"),
                                  (self.minimo, "0")):
@@ -456,8 +455,8 @@ class FichaArticulos(tk.Frame):
             self.refrescar()
             self.cargar(codigo)
             self._avisar_cambio()
-            self.aviso.config(text="Cambios guardados.", fg=VERDE)
-            self.after(2500, lambda: self.aviso.config(text="", fg=AMBAR))
+            self.aviso.config(text="Cambios guardados.", fg=tema.TXT_OK)
+            self.after(2500, lambda: self.aviso.config(text="", fg=tema.TXT_AVISO))
 
     def dar_baja(self) -> None:
         if self.codigo_actual is None:
@@ -506,7 +505,7 @@ class FichaArticulos(tk.Frame):
 # Pestaña de personal
 class FichaPersonas(tk.Frame):
     def __init__(self, padre, con, al_cambiar=None):
-        super().__init__(padre, bg=FONDO)
+        super().__init__(padre, bg=tema.FONDO)
         self.con = con
         self.al_cambiar = al_cambiar
         self.codigo_actual: str | None = None
@@ -519,7 +518,7 @@ class FichaPersonas(tk.Frame):
         self.columnconfigure(1, weight=0, minsize=380)
         self.rowconfigure(0, weight=1)
 
-        izq = tk.Frame(self, bg=FONDO)
+        izq = tk.Frame(self, bg=tema.FONDO)
         izq.grid(row=0, column=0, sticky="nsew", padx=(14, 8), pady=14)
         izq.rowconfigure(1, weight=1)
         izq.columnconfigure(0, weight=1)
@@ -527,8 +526,8 @@ class FichaPersonas(tk.Frame):
         self.ver_bajas = tk.BooleanVar(value=False)
         tk.Checkbutton(izq, text="Mostrar tambien al personal dado de baja",
                        variable=self.ver_bajas, command=self.refrescar,
-                       bg=FONDO, fg=SUAVE, selectcolor=PANEL, bd=0,
-                       activebackground=FONDO, activeforeground=TEXTO,
+                       bg=tema.FONDO, fg=tema.SUAVE, selectcolor=tema.PANEL, bd=0,
+                       activebackground=tema.FONDO, activeforeground=tema.TEXTO,
                        font=("Segoe UI", 9), highlightthickness=0
                        ).grid(row=0, column=0, columnspan=2, sticky="w",
                               pady=(0, 6))
@@ -549,51 +548,51 @@ class FichaPersonas(tk.Frame):
         barra_v.grid(row=1, column=1, sticky="ns")
         self.tabla.configure(yscrollcommand=barra_v.set)
         self.tabla.bind("<<TreeviewSelect>>", self._al_seleccionar)
-        self.tabla.tag_configure("baja", foreground="#6b7285")
-        self.tabla.tag_configure("debe", foreground="#f0a868")
+        self.tabla.tag_configure("baja", foreground=tema.TXT_BAJA)
+        self.tabla.tag_configure("debe", foreground=tema.TXT_SALIDA)
 
-        pie = tk.Frame(izq, bg=FONDO)
+        pie = tk.Frame(izq, bg=tema.FONDO)
         pie.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(8, 0))
         tema.boton(pie, "Imprimir todos los gafetes",
                    self.imprimir_todos).pack(side="left")
-        self.conteo = tk.Label(pie, text="", bg=FONDO, fg=SUAVE,
+        self.conteo = tk.Label(pie, text="", bg=tema.FONDO, fg=tema.SUAVE,
                                font=("Segoe UI", 9))
         self.conteo.pack(side="right")
 
-        der = tk.Frame(self, bg=PANEL)
+        der = tk.Frame(self, bg=tema.PANEL)
         der.grid(row=0, column=1, sticky="nsew", padx=(8, 14), pady=14)
         der.columnconfigure(0, weight=1)
 
-        self.encabezado = tk.Label(der, text="Nuevo operador", bg=PANEL,
-                                   fg=TEXTO, font=("Segoe UI", 15, "bold"),
+        self.encabezado = tk.Label(der, text="Nuevo operador", bg=tema.PANEL,
+                                   fg=tema.TEXTO, font=("Segoe UI", 15, "bold"),
                                    anchor="w")
         self.encabezado.pack(fill="x", padx=16, pady=(16, 2))
         self.lbl_codigo = tk.Label(der, text="El gafete se asigna solo",
-                                   bg=PANEL, fg=SUAVE, font=("Consolas", 11),
+                                   bg=tema.PANEL, fg=tema.SUAVE, font=("Consolas", 11),
                                    anchor="w")
         self.lbl_codigo.pack(fill="x", padx=16, pady=(0, 12))
 
-        tk.Label(der, text="Nombre completo", bg=PANEL, fg=SUAVE,
+        tk.Label(der, text="Nombre completo", bg=tema.PANEL, fg=tema.SUAVE,
                  font=("Segoe UI", 9, "bold"), anchor="w").pack(fill="x",
                                                                 padx=16)
         self.nombre = tema.entrada(der)
         self.nombre.pack(fill="x", padx=16, pady=(2, 10), ipady=4)
         self.nombre.bind("<Return>", lambda e: self.guardar())
 
-        self.aviso = tk.Label(der, text="", bg=PANEL, fg=AMBAR,
+        self.aviso = tk.Label(der, text="", bg=tema.PANEL, fg=tema.TXT_AVISO,
                               font=("Segoe UI", 9), anchor="w", wraplength=300,
                               justify="left")
         self.aviso.pack(fill="x", padx=16)
 
-        botones = tk.Frame(der, bg=PANEL)
+        botones = tk.Frame(der, bg=tema.PANEL)
         botones.pack(fill="x", padx=16, pady=14)
-        tema.boton(botones, "Guardar", self.guardar, VERDE).pack(side="left")
-        tema.boton(botones, "Nuevo", self.limpiar,CYAN).pack(side="left", padx=6)
-        self.btn_baja = tema.boton(botones, "Dar de baja", self.dar_baja, ROJO)
+        tema.boton(botones, "Guardar", self.guardar, tema.VERDE).pack(side="left")
+        tema.boton(botones, "Nuevo", self.limpiar,tema.CYAN).pack(side="left", padx=6)
+        self.btn_baja = tema.boton(botones, "Dar de baja", self.dar_baja, tema.ROJO)
         self.btn_baja.pack(side="left")
 
         tema.boton(der, "Imprimir este gafete",
-                   self.imprimir_actual,CYAN).pack(anchor="w", padx=16, pady=(0, 16))
+                   self.imprimir_actual,tema.CYAN).pack(anchor="w", padx=16, pady=(0, 16))
 
     def refrescar(self) -> None:
         self.tabla.delete(*self.tabla.get_children())
@@ -625,23 +624,23 @@ class FichaPersonas(tk.Frame):
             return
         self.codigo_actual = fila["codigo"]
         self.encabezado.config(text=fila["nombre"][:30])
-        self.lbl_codigo.config(text=fila["codigo"], fg=TEXTO)
+        self.lbl_codigo.config(text=fila["codigo"], fg=tema.TEXTO)
         self.nombre.delete(0, "end")
         self.nombre.insert(0, fila["nombre"])
 
         activo = bool(fila["activo"])
         self.btn_baja.config(text="Dar de baja" if activo else "Reactivar",
-                             bg=ROJO if activo else VERDE)
+                             bg=tema.ROJO if activo else tema.VERDE)
 
         pendientes = inventario.tiene_pendientes(self.con, fila["codigo"])
         if pendientes:
             lista = ", ".join(p["nombre"] for p in pendientes[:4])
             self.aviso.config(
                 text=f"Tiene {len(pendientes)} articulo(s) sin devolver: {lista}",
-                fg=AMBAR)
+                fg=tema.TXT_AVISO)
         elif not activo:
             self.aviso.config(text="Dado de baja: el escaner ya no lo reconoce.",
-                              fg=SUAVE)
+                              fg=tema.SUAVE)
         else:
             self.aviso.config(text="")
 
@@ -650,10 +649,10 @@ class FichaPersonas(tk.Frame):
         self.tabla.selection_remove(*self.tabla.selection())
         self.encabezado.config(text="Nuevo operador")
         self.lbl_codigo.config(text="El gafete se asigna solo al guardar",
-                               fg=SUAVE)
+                               fg=tema.SUAVE)
         self.nombre.delete(0, "end")
         self.aviso.config(text="")
-        self.btn_baja.config(text="Dar de baja", bg=ROJO)
+        self.btn_baja.config(text="Dar de baja", bg=tema.ROJO)
         self.nombre.focus_set()
 
     def _avisar_cambio(self) -> None:
@@ -684,8 +683,8 @@ class FichaPersonas(tk.Frame):
             self.refrescar()
             self.cargar(codigo)
             self._avisar_cambio()
-            self.aviso.config(text="Cambios guardados.", fg=VERDE)
-            self.after(2500, lambda: self.aviso.config(text="", fg=AMBAR))
+            self.aviso.config(text="Cambios guardados.", fg=tema.TXT_OK)
+            self.after(2500, lambda: self.aviso.config(text="", fg=tema.TXT_AVISO))
 
     def dar_baja(self) -> None:
         if self.codigo_actual is None:
@@ -747,7 +746,7 @@ class PanelGestion(tk.Toplevel):
         self.title("Catalogo - herramienta, material y personal")
         self.geometry("1120x700")
         self.minsize(960, 620)
-        self.configure(bg=FONDO)
+        self.configure(bg=tema.FONDO)
         tema.aplicar_estilo(self)
 
         cuaderno = ttk.Notebook(self)
@@ -759,16 +758,16 @@ class PanelGestion(tk.Toplevel):
         cuaderno.add(self.articulos, text="  Herramienta y material  ")
         cuaderno.add(self.personas, text="  Personal  ")
 
-        pie = tk.Frame(self, bg=FONDO)
+        pie = tk.Frame(self, bg=tema.FONDO)
         pie.pack(fill="x", padx=16, pady=(0, 12))
-        tk.Label(pie, bg=FONDO, fg=SUAVE, font=("Segoe UI", 9),
+        tk.Label(pie, bg=tema.FONDO, fg=tema.SUAVE, font=("Segoe UI", 9),
                  text="Dar de baja no borra nada: el historial se conserva y el "
                       "articulo se puede reactivar cuando quieras.",
                  ).pack(side="left")
         tema.boton(pie, "Importar desde CSV", self.importar).pack(side="right",
                                                                   padx=4)
         tema.boton(pie, "Imprimir TODO en una hoja", self.imprimir_todo,
-                   AZUL).pack(side="right", padx=4)
+                   tema.AZUL).pack(side="right", padx=4)
         tema.boton(pie, "Compartir (solo lectura)",
                    self.configurar_carpeta_compartida).pack(side="right",
                                                             padx=4)

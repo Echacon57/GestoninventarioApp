@@ -24,7 +24,6 @@ import inventario
 import snapshot
 import tema
 from inventario import fmt, fmt_dinero
-from tema import AMBAR, AZUL, CAMPO, FONDO, PANEL, ROJO, SUAVE, TEXTO, VERDE
 
 # Cada cuanto se refresca solo, ademas del boton manual. En segundos.
 INTERVALO_REFRESCO_SEG = 60
@@ -54,7 +53,7 @@ class VisorInventario(tk.Tk):
         self.title("Inventario de bodega - solo lectura")
         self.geometry("1040x680")
         self.minsize(880, 560)
-        self.configure(bg=FONDO)
+        self.configure(bg=tema.FONDO)
         tema.aplicar_estilo(self)
 
         self._construir()
@@ -67,16 +66,16 @@ class VisorInventario(tk.Tk):
 
     # ---------------------------------------------------------------- Interfaz de Usuario
     def _construir(self) -> None:
-        cabecera = tk.Frame(self, bg=PANEL)
+        cabecera = tk.Frame(self, bg=tema.PANEL)
         cabecera.pack(fill="x")
-        interior = tk.Frame(cabecera, bg=PANEL)
+        interior = tk.Frame(cabecera, bg=tema.PANEL)
         interior.pack(fill="x", padx=16, pady=10)
 
         tk.Label(interior, text="Inventario de bodega — solo lectura",
-                 bg=PANEL, fg=TEXTO, font=("Segoe UI", 13, "bold")
+                 bg=tema.PANEL, fg=tema.TEXTO, font=("Segoe UI", 13, "bold")
                  ).pack(side="left")
 
-        self.lbl_estado = tk.Label(interior, text="", bg=PANEL, fg=SUAVE,
+        self.lbl_estado = tk.Label(interior, text="", bg=tema.PANEL, fg=tema.SUAVE,
                                    font=("Segoe UI", 10))
         self.lbl_estado.pack(side="right", padx=(0, 12))
         tema.boton(interior, "Actualizar ahora", self.actualizar
@@ -85,6 +84,8 @@ class VisorInventario(tk.Tk):
                   ).pack(side="right", padx=4)
         tema.boton(interior, "Exportar", self.exportar).pack(side="right",
                                                               padx=4)
+        tema.boton_tema(interior, self, self._estado_para_reabrir
+                        ).pack(side="right", padx=4)
 
         cuaderno = ttk.Notebook(self)
         cuaderno.pack(fill="both", expand=True, padx=12, pady=12)
@@ -97,12 +98,12 @@ class VisorInventario(tk.Tk):
         cuaderno.add(self.pestana_reportes, text="  Reportes y personal  ")
 
     def _construir_inventario(self, cuaderno) -> tk.Frame:
-        marco = tk.Frame(cuaderno, bg=FONDO)
+        marco = tk.Frame(cuaderno, bg=tema.FONDO)
         marco.columnconfigure(0, weight=3)
         marco.columnconfigure(1, weight=2, minsize=320)
         marco.rowconfigure(2, weight=1)
 
-        barra = tk.Frame(marco, bg=FONDO)
+        barra = tk.Frame(marco, bg=tema.FONDO)
         barra.grid(row=0, column=0, sticky="ew", padx=(14, 8), pady=(14, 6))
         tema.titulo(barra, "Buscar").pack(side="left", padx=(0, 8))
         self.busqueda = tk.StringVar()
@@ -110,11 +111,11 @@ class VisorInventario(tk.Tk):
         tema.entrada(barra, textvariable=self.busqueda).pack(
             side="left", fill="x", expand=True, ipady=4)
 
-        fila_filtros = tk.Frame(marco, bg=FONDO)
+        fila_filtros = tk.Frame(marco, bg=tema.FONDO)
         fila_filtros.grid(row=1, column=0, sticky="ew", padx=(14, 8),
                           pady=(0, 6))
 
-        tk.Label(fila_filtros, text="Estado:", bg=FONDO, fg=SUAVE,
+        tk.Label(fila_filtros, text="Estado:", bg=tema.FONDO, fg=tema.SUAVE,
                  font=("Segoe UI", 9)).pack(side="left", padx=(0, 4))
         self.filtro_estado = ttk.Combobox(
             fila_filtros, state="readonly", width=16, font=("Segoe UI", 9),
@@ -124,7 +125,7 @@ class VisorInventario(tk.Tk):
         self.filtro_estado.bind("<<ComboboxSelected>>",
                                 lambda e: self._refrescar_lista())
 
-        tk.Label(fila_filtros, text="Ubicacion:", bg=FONDO, fg=SUAVE,
+        tk.Label(fila_filtros, text="Ubicacion:", bg=tema.FONDO, fg=tema.SUAVE,
                  font=("Segoe UI", 9)).pack(side="left", padx=(12, 4))
         self.filtro_ubicacion = ttk.Combobox(
             fila_filtros, state="readonly", width=16, font=("Segoe UI", 9),
@@ -140,7 +141,7 @@ class VisorInventario(tk.Tk):
                    "estado": "Estado"}
         anchos = {"codigo": 80, "nombre": 220, "tipo": 90, "exist": 80,
                   "ubicacion": 110, "estado": 84}
-        izq = tk.Frame(marco, bg=FONDO)
+        izq = tk.Frame(marco, bg=tema.FONDO)
         izq.grid(row=2, column=0, sticky="nsew", padx=(14, 8), pady=(0, 14))
         izq.rowconfigure(0, weight=1)
         izq.columnconfigure(0, weight=1)
@@ -158,14 +159,14 @@ class VisorInventario(tk.Tk):
         barra_v.grid(row=0, column=1, sticky="ns")
         self.tabla.configure(yscrollcommand=barra_v.set)
         self.tabla.bind("<<TreeviewSelect>>", self._al_seleccionar)
-        self.tabla.tag_configure("baja", foreground="#6b7285")
-        self.tabla.tag_configure("fuera", foreground="#f0a868")
+        self.tabla.tag_configure("baja", foreground=tema.TXT_BAJA)
+        self.tabla.tag_configure("fuera", foreground=tema.TXT_SALIDA)
 
-        self.conteo = tk.Label(izq, text="", bg=FONDO, fg=SUAVE,
+        self.conteo = tk.Label(izq, text="", bg=tema.FONDO, fg=tema.SUAVE,
                                font=("Segoe UI", 9))
         self.conteo.grid(row=1, column=0, sticky="w", pady=(6, 0))
 
-        self.detalle = tk.Frame(marco, bg=PANEL)
+        self.detalle = tk.Frame(marco, bg=tema.PANEL)
         self.detalle.grid(row=2, column=1, sticky="nsew", padx=(8, 14),
                           pady=(0, 14))
         self._mostrar_detalle(None)
@@ -173,11 +174,11 @@ class VisorInventario(tk.Tk):
         return marco
 
     def _construir_movimientos(self, cuaderno) -> tk.Frame:
-        marco = tk.Frame(cuaderno, bg=FONDO)
+        marco = tk.Frame(cuaderno, bg=tema.FONDO)
         marco.columnconfigure(0, weight=1)
         marco.rowconfigure(1, weight=1)
 
-        barra = tk.Frame(marco, bg=FONDO)
+        barra = tk.Frame(marco, bg=tema.FONDO)
         barra.grid(row=0, column=0, sticky="ew", padx=14, pady=(14, 6))
         tema.titulo(barra, "Buscar (codigo, articulo u operador)").pack(
             side="left", padx=(0, 8))
@@ -194,7 +195,7 @@ class VisorInventario(tk.Tk):
         anchos = {"fecha": 140, "tipo": 80, "codigo": 90, "articulo": 260,
                   "cant": 90, "persona": 150}
 
-        cont = tk.Frame(marco, bg=FONDO)
+        cont = tk.Frame(marco, bg=tema.FONDO)
         cont.grid(row=1, column=0, sticky="nsew", padx=14, pady=(0, 6))
         cont.rowconfigure(0, weight=1)
         cont.columnconfigure(0, weight=1)
@@ -211,11 +212,11 @@ class VisorInventario(tk.Tk):
                                 command=self.tabla_movs.yview)
         barra_v.grid(row=0, column=1, sticky="ns")
         self.tabla_movs.configure(yscrollcommand=barra_v.set)
-        self.tabla_movs.tag_configure("SALIDA", foreground="#f0a868")
-        self.tabla_movs.tag_configure("ENTRADA", foreground="#7fd6a0")
-        self.tabla_movs.tag_configure("AJUSTE", foreground="#9aa3b5")
+        self.tabla_movs.tag_configure("SALIDA", foreground=tema.TXT_SALIDA)
+        self.tabla_movs.tag_configure("ENTRADA", foreground=tema.TXT_ENTRADA)
+        self.tabla_movs.tag_configure("AJUSTE", foreground=tema.SUAVE)
 
-        self.conteo_movs = tk.Label(marco, text="", bg=FONDO, fg=SUAVE,
+        self.conteo_movs = tk.Label(marco, text="", bg=tema.FONDO, fg=tema.SUAVE,
                                     font=("Segoe UI", 9))
         self.conteo_movs.grid(row=2, column=0, sticky="w", padx=14,
                               pady=(0, 14))
@@ -223,16 +224,16 @@ class VisorInventario(tk.Tk):
         return marco
 
     def _construir_reportes(self, cuaderno) -> tk.Frame:
-        marco = tk.Frame(cuaderno, bg=FONDO)
+        marco = tk.Frame(cuaderno, bg=tema.FONDO)
 
-        resumen = tk.Frame(marco, bg=PANEL)
+        resumen = tk.Frame(marco, bg=tema.PANEL)
         resumen.pack(fill="x", padx=14, pady=14)
-        self.lbl_valor = tk.Label(resumen, text="", bg=PANEL, fg=TEXTO,
+        self.lbl_valor = tk.Label(resumen, text="", bg=tema.PANEL, fg=tema.TEXTO,
                                   font=("Segoe UI", 13, "bold"), anchor="w",
                                   justify="left")
         self.lbl_valor.pack(fill="x", padx=16, pady=12)
 
-        columnas_2 = tk.Frame(marco, bg=FONDO)
+        columnas_2 = tk.Frame(marco, bg=tema.FONDO)
         columnas_2.pack(fill="both", expand=True, padx=14, pady=(0, 14))
         columnas_2.columnconfigure(0, weight=1)
         columnas_2.columnconfigure(1, weight=1)
@@ -246,12 +247,12 @@ class VisorInventario(tk.Tk):
         return marco
 
     def _caja_texto(self, padre, titulo: str, columna: int) -> tk.Text:
-        marco = tk.Frame(padre, bg=PANEL)
+        marco = tk.Frame(padre, bg=tema.PANEL)
         marco.grid(row=0, column=columna, sticky="nsew",
                   padx=(0, 8) if columna == 0 else (8, 0))
-        tema.titulo(marco, titulo, bg=PANEL).pack(anchor="w", padx=12,
+        tema.titulo(marco, titulo, bg=tema.PANEL).pack(anchor="w", padx=12,
                                                    pady=(10, 4))
-        caja = tk.Text(marco, bg=CAMPO, fg=TEXTO, font=("Consolas", 9),
+        caja = tk.Text(marco, bg=tema.CAMPO, fg=tema.TEXTO, font=("Consolas", 9),
                        relief="flat", wrap="none", height=10)
         caja.pack(fill="both", expand=True, padx=12, pady=(0, 12))
         caja.config(state="disabled")
@@ -263,19 +264,19 @@ class VisorInventario(tk.Tk):
 
         if art is None:
             tk.Label(self.detalle, text="Selecciona un articulo de la lista",
-                     bg=PANEL, fg=SUAVE, font=("Segoe UI", 10),
+                     bg=tema.PANEL, fg=tema.SUAVE, font=("Segoe UI", 10),
                      wraplength=260).pack(padx=16, pady=16)
             return
 
-        tk.Label(self.detalle, text=art["nombre"], bg=PANEL, fg=TEXTO,
+        tk.Label(self.detalle, text=art["nombre"], bg=tema.PANEL, fg=tema.TEXTO,
                  font=("Segoe UI", 14, "bold"), anchor="w", wraplength=300,
                  justify="left").pack(fill="x", padx=16, pady=(16, 2))
-        tk.Label(self.detalle, text=art["codigo"], bg=PANEL, fg=SUAVE,
+        tk.Label(self.detalle, text=art["codigo"], bg=tema.PANEL, fg=tema.SUAVE,
                  font=("Consolas", 11), anchor="w").pack(fill="x", padx=16,
                                                          pady=(0, 10))
 
         if not art["activo"]:
-            tk.Label(self.detalle, text="DADO DE BAJA", bg=PANEL, fg=ROJO,
+            tk.Label(self.detalle, text="DADO DE BAJA", bg=tema.PANEL, fg=tema.TXT_ERROR,
                      font=("Segoe UI", 9, "bold"), anchor="w").pack(
                 fill="x", padx=16, pady=(0, 8))
 
@@ -291,20 +292,20 @@ class VisorInventario(tk.Tk):
             ("Valor unitario", fmt_dinero(art["valor_unitario"])),
         ]
         for etiqueta, valor in campos:
-            fila = tk.Frame(self.detalle, bg=PANEL)
+            fila = tk.Frame(self.detalle, bg=tema.PANEL)
             fila.pack(fill="x", padx=16, pady=2)
-            tk.Label(fila, text=etiqueta, bg=PANEL, fg=SUAVE,
+            tk.Label(fila, text=etiqueta, bg=tema.PANEL, fg=tema.SUAVE,
                      font=("Segoe UI", 9), width=14, anchor="w").pack(
                 side="left")
-            tk.Label(fila, text=valor, bg=PANEL, fg=TEXTO,
+            tk.Label(fila, text=valor, bg=tema.PANEL, fg=tema.TEXTO,
                      font=("Segoe UI", 9), anchor="w", wraplength=170,
                      justify="left").pack(side="left", fill="x", expand=True)
 
         if art["notas"]:
-            tk.Label(self.detalle, text="Notas", bg=PANEL, fg=SUAVE,
+            tk.Label(self.detalle, text="Notas", bg=tema.PANEL, fg=tema.SUAVE,
                      font=("Segoe UI", 9, "bold"), anchor="w").pack(
                 fill="x", padx=16, pady=(10, 0))
-            tk.Label(self.detalle, text=art["notas"], bg=PANEL, fg=TEXTO,
+            tk.Label(self.detalle, text=art["notas"], bg=tema.PANEL, fg=tema.TEXTO,
                      font=("Segoe UI", 9), anchor="w", wraplength=280,
                      justify="left").pack(fill="x", padx=16, pady=(0, 12))
 
@@ -371,21 +372,29 @@ class VisorInventario(tk.Tk):
         if not carpeta:
             if self.carpeta is None:
                 self.lbl_estado.config(text="Sin carpeta configurada",
-                                       fg=AMBAR)
+                                       fg=tema.TXT_AVISO)
             return
         self.carpeta = Path(carpeta)
         snapshot.guardar_carpeta_configurada(snapshot.RUTA_CONFIG_VISOR,
                                              self.carpeta)
         self.actualizar()
 
+    def _estado_para_reabrir(self) -> dict:
+        """Al cambiar de tema la ventana se reconstruye y vuelve a leer la
+        carpeta compartida; la copia local actual ya no se usa."""
+        if self.con is not None:
+            self.con.close()
+            self.con = None
+        return {}
+
     def actualizar(self) -> None:
         if self.carpeta is None:
-            self.lbl_estado.config(text="Sin carpeta configurada", fg=AMBAR)
+            self.lbl_estado.config(text="Sin carpeta configurada", fg=tema.TXT_AVISO)
             return
         try:
             ruta_cache, momento = snapshot.sincronizar(self.carpeta)
         except snapshot.ErrorSincronizacion as err:
-            self.lbl_estado.config(text="No se pudo actualizar", fg=ROJO)
+            self.lbl_estado.config(text="No se pudo actualizar", fg=tema.TXT_ERROR)
             messagebox.showwarning("No se pudo actualizar", str(err),
                                    parent=self)
             return
@@ -409,12 +418,12 @@ class VisorInventario(tk.Tk):
     def _actualizar_lbl_estado(self) -> None:
         if self.momento_datos is None:
             return
-        color = TEXTO
+        color = tema.TEXTO
         antiguedad = datetime.now() - self.momento_datos
         if antiguedad.total_seconds() > 30 * 60:
-            color = ROJO
+            color = tema.TXT_ERROR
         elif antiguedad.total_seconds() > 10 * 60:
-            color = AMBAR
+            color = tema.TXT_AVISO
         self.lbl_estado.config(
             text=f"Datos de {_hace(self.momento_datos)} "
                  f"({self.momento_datos:%d/%m %H:%M})", fg=color)
@@ -519,4 +528,4 @@ class VisorInventario(tk.Tk):
 
 
 if __name__ == "__main__":
-    VisorInventario().mainloop()
+    tema.ejecutar(VisorInventario)

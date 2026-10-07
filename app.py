@@ -24,7 +24,6 @@ import snapshot
 import tema
 from inventario import MODO_AUTO, MODO_ENTRADA, MODO_SALIDA, fmt
 from registromanual import VentanaManual
-from tema import AZUL, COLOR_NIVEL, CYAN, FONDO, PANEL, SUAVE, TEXTO
 
 # Si el mismo codigo llega dos veces en menos de este tiempo, se ignora.
 # El gatillo del lector a veces dispara doble.
@@ -32,20 +31,27 @@ REBOTE_SEG = 1.2
 
 
 class AppInventario(tk.Tk):
-    def __init__(self) -> None:
+    def __init__(self, con=None, persona=None, persona_nombre="",
+                 modo=MODO_AUTO) -> None:
+        """Los argumentos solo se usan al reconstruir la ventana tras cambiar
+        de tema, para seguir con la misma conexion, operador y modo."""
         super().__init__()
-        self.con = db.conectar()          # aqui se dispara el respaldo automatico
+        # aqui se dispara el respaldo automatico (solo la primera vez)
+        self.con = con or db.conectar()
         self.persona = None               # codigo del operador activo
         self.persona_nombre = ""
+        self._modo_inicial = modo
         self.ultimo = ("", 0.0)           # (codigo, momento) para evitar dobles
         self._ventanas_simples = {}       # clave -> Toplevel, para no duplicar
 
         self.title("Inventario de bodega - escaneo")
         self.geometry("1100x680")
         self.minsize(1100, 600)
-        self.configure(bg=FONDO)
+        self.configure(bg=tema.FONDO)
 
         self._construir()
+        if persona:
+            self.fijar_persona(persona, persona_nombre)
         self._refrescar_tabla()
         self._refrescar_resumen()
         self.after(200, lambda: self.entrada.focus_force())
@@ -56,13 +62,13 @@ class AppInventario(tk.Tk):
         tema.aplicar_estilo(self)
 
         # --- barra superior: modo y operador
-        barra = tk.Frame(self, bg=FONDO)
+        barra = tk.Frame(self, bg=tema.FONDO)
         barra.pack(fill="x", padx=16, pady=(14, 6))
 
-        tk.Label(barra, text="MODO", bg=FONDO, fg=SUAVE,
+        tk.Label(barra, text="MODO", bg=tema.FONDO, fg=tema.SUAVE,
                  font=("Segoe UI", 9, "bold")).pack(side="left", padx=(0, 8))
 
-        self.modo = tk.StringVar(value=MODO_AUTO)
+        self.modo = tk.StringVar(value=self._modo_inicial)
         for valor, etiqueta in (
             (MODO_AUTO, "Automatico (F1)"),
             (MODO_SALIDA, "Solo salidas (F2)"),
@@ -70,57 +76,61 @@ class AppInventario(tk.Tk):
         ):
             tk.Radiobutton(
                 barra, text=etiqueta, value=valor, variable=self.modo,
-                bg=FONDO, fg=TEXTO, selectcolor=PANEL, activebackground=FONDO,
-                activeforeground=TEXTO, font=("Segoe UI", 10),
+                bg=tema.FONDO, fg=tema.TEXTO, selectcolor=tema.PANEL, activebackground=tema.FONDO,
+                activeforeground=tema.TEXTO, font=("Segoe UI", 10),
                 highlightthickness=0, bd=0,
             ).pack(side="left", padx=4)
 
-        self.lbl_persona = tk.Label(barra, text="Operador: (ninguno)", bg=FONDO,
-                                    fg=SUAVE, font=("Segoe UI", 10, "bold"))
+        tema.boton_tema(barra, self, self._estado_para_reabrir,
+                        font=("Segoe UI", 9), pady=3
+                        ).pack(side="right", padx=(12, 0))
+
+        self.lbl_persona = tk.Label(barra, text="Operador: (ninguno)", bg=tema.FONDO,
+                                    fg=tema.SUAVE, font=("Segoe UI", 10, "bold"))
         self.lbl_persona.pack(side="right")
 
         # --- caja de escaneo
-        caja = tk.Frame(self, bg=PANEL)
+        caja = tk.Frame(self, bg=tema.PANEL)
         caja.pack(fill="x", padx=16, pady=6)
 
-        tk.Label(caja, text="Escanea aqui", bg=PANEL, fg=SUAVE,
+        tk.Label(caja, text="Escanea aqui", bg=tema.PANEL, fg=tema.SUAVE,
                  font=("Segoe UI", 10)).grid(row=0, column=0, sticky="w",
                                              padx=14, pady=(10, 0))
-        self.entrada = tk.Entry(caja, font=("Consolas", 26), bg="#131722",
-                                fg=TEXTO, insertbackground=TEXTO,
+        self.entrada = tk.Entry(caja, font=("Consolas", 26), bg=tema.CAMPO,
+                                fg=tema.TEXTO, insertbackground=tema.TEXTO,
                                 relief="flat", justify="center")
         self.entrada.grid(row=1, column=0, sticky="ew", padx=14, pady=(2, 12),
                           ipady=8)
         caja.columnconfigure(0, weight=1)
 
-        lado = tk.Frame(caja, bg=PANEL)
+        lado = tk.Frame(caja, bg=tema.PANEL)
         lado.grid(row=0, column=1, rowspan=2, padx=(0, 14))
-        tk.Label(lado, text="Cantidad (consumibles)", bg=PANEL, fg=SUAVE,
+        tk.Label(lado, text="Cantidad (consumibles)", bg=tema.PANEL, fg=tema.SUAVE,
                  font=("Segoe UI", 9)).pack(anchor="w")
         self.cantidad = tk.StringVar(value="1")
         tk.Spinbox(lado, from_=0.5, to=9999, increment=1, width=7,
                    textvariable=self.cantidad, font=("Segoe UI", 16),
-                   justify="center", bg="#131722", fg=TEXTO, relief="flat",
-                   buttonbackground=PANEL).pack(pady=4)
+                   justify="center", bg=tema.CAMPO, fg=tema.TEXTO, relief="flat",
+                   buttonbackground=tema.PANEL).pack(pady=4)
 
         # --- banner de resultado
-        self.banner = tk.Frame(self, bg=PANEL, height=92)
+        self.banner = tk.Frame(self, bg=tema.PANEL, height=92)
         self.banner.pack(fill="x", padx=16, pady=6)
         self.banner.pack_propagate(False)
         self.titulo = tk.Label(self.banner, text="Listo para escanear",
-                               bg=PANEL, fg=TEXTO, font=("Segoe UI", 20, "bold"),
+                               bg=tema.PANEL, fg=tema.TEXTO, font=("Segoe UI", 20, "bold"),
                                anchor="w")
         self.titulo.pack(fill="x", padx=16, pady=(14, 0))
         self.detalle = tk.Label(self.banner, text="Escanea primero el gafete del "
                                 "operador, luego las herramientas o materiales.",
-                                bg=PANEL, fg=TEXTO, font=("Segoe UI", 11),
+                                bg=tema.PANEL, fg=tema.TEXTO, font=("Segoe UI", 11),
                                 anchor="w")
         self.detalle.pack(fill="x", padx=16)
 
         # --- tabla de movimientos
-        marco = tk.Frame(self, bg=FONDO)
+        marco = tk.Frame(self, bg=tema.FONDO)
         marco.pack(fill="both", expand=True, padx=16, pady=6)
-        tk.Label(marco, text="Ultimos movimientos", bg=FONDO, fg=SUAVE,
+        tk.Label(marco, text="Ultimos movimientos", bg=tema.FONDO, fg=tema.SUAVE,
                  font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(0, 4))
 
         columnas = ("fecha", "tipo", "codigo", "articulo", "cant", "persona")
@@ -135,27 +145,27 @@ class AppInventario(tk.Tk):
             self.tabla.column(col, width=anchos[col],
                               anchor="center" if col in ("tipo", "cant") else "w")
         self.tabla.pack(fill="both", expand=True)
-        self.tabla.tag_configure("SALIDA", foreground="#f0a868")
-        self.tabla.tag_configure("ENTRADA", foreground="#7fd6a0")
-        self.tabla.tag_configure("AJUSTE", foreground="#9aa3b5")
+        self.tabla.tag_configure("SALIDA", foreground=tema.TXT_SALIDA)
+        self.tabla.tag_configure("ENTRADA", foreground=tema.TXT_ENTRADA)
+        self.tabla.tag_configure("AJUSTE", foreground=tema.SUAVE)
 
         # --- pie: resumen y botones
-        pie = tk.Frame(self, bg=FONDO)
+        pie = tk.Frame(self, bg=tema.FONDO)
         pie.pack(fill="x", padx=16, pady=(4, 14))
-        self.resumen = tk.Label(pie, text="", bg=FONDO, fg=SUAVE,
+        self.resumen = tk.Label(pie, text="", bg=tema.FONDO, fg=tema.SUAVE,
                                 font=("Segoe UI", 10))
         self.resumen.pack(side="left")
 
         tk.Button(pie, text="Catalogo / dar de alta", command=self.abrir_gestion,
-                  bg=AZUL, fg=TEXTO, relief="flat", font=("Segoe UI", 9, "bold"),
-                  padx=14, pady=4, activebackground=PANEL,
-                  activeforeground=TEXTO, takefocus=False,
+                  bg=tema.AZUL, fg=tema.SOBRE_COLOR, relief="flat", font=("Segoe UI", 9, "bold"),
+                  padx=14, pady=4, activebackground=tema.PANEL,
+                  activeforeground=tema.TEXTO, takefocus=False,
                   cursor="hand2").pack(side="right", padx=(12, 4))
 
         tk.Button(pie, text="Registro manual (F4)", command=self.abrir_manual,
-                  bg=CYAN, fg=TEXTO, relief="flat", font=("Segoe UI", 9, "bold"),
-                  padx=14, pady=4, activebackground=PANEL,
-                  activeforeground=TEXTO, takefocus=False,
+                  bg=tema.CYAN, fg=tema.SOBRE_COLOR, relief="flat", font=("Segoe UI", 9, "bold"),
+                  padx=14, pady=4, activebackground=tema.PANEL,
+                  activeforeground=tema.TEXTO, takefocus=False,
                   cursor="hand2").pack(side="right", padx=4)
 
         for texto, comando in (
@@ -163,9 +173,9 @@ class AppInventario(tk.Tk):
             ("Bajo minimo", self.ver_bajo_stock),
             ("Pendientes", self.ver_pendientes),
         ):
-            tk.Button(pie, text=texto, command=comando, bg=PANEL, fg=TEXTO,
+            tk.Button(pie, text=texto, command=comando, bg=tema.PANEL, fg=tema.TEXTO,
                       relief="flat", font=("Segoe UI", 9), padx=12, pady=4,
-                      activebackground=AZUL, activeforeground=TEXTO,
+                      activebackground=tema.AZUL, activeforeground=tema.TEXTO,
                       takefocus=False).pack(side="right", padx=4)
 
         # --- atajos
@@ -220,18 +230,18 @@ class AppInventario(tk.Tk):
         self.persona = codigo
         self.persona_nombre = nombre
         self.lbl_persona.config(text=f"Operador: {nombre}  (Esc para quitar)",
-                                fg=TEXTO)
+                                fg=tema.TEXTO)
 
     def limpiar_persona(self) -> None:
         self.persona = None
         self.persona_nombre = ""
-        self.lbl_persona.config(text="Operador: (ninguno)", fg=SUAVE)
+        self.lbl_persona.config(text="Operador: (ninguno)", fg=tema.SUAVE)
         self.entrada.focus_set()
 
     def _mostrar(self, resultado: inventario.Resultado) -> None:
-        color = COLOR_NIVEL.get(resultado.nivel, PANEL)
+        color = tema.COLOR_NIVEL.get(resultado.nivel, tema.PANEL)
         for widget in (self.banner, self.titulo, self.detalle):
-            widget.config(bg=color)
+            widget.config(bg=color, fg=tema.color_texto_sobre(color))
         self.titulo.config(text=resultado.titulo)
         self.detalle.config(text=resultado.detalle)
         if not resultado.ok:
@@ -328,6 +338,11 @@ class AppInventario(tk.Tk):
             return
         self._manual = VentanaManual(self)
 
+    def _estado_para_reabrir(self) -> dict:
+        """Lo que conserva la ventana al reconstruirse por cambio de tema."""
+        return {"con": self.con, "persona": self.persona,
+                "persona_nombre": self.persona_nombre, "modo": self.modo.get()}
+
     def _tras_gestion(self) -> None:
         self._refrescar_tabla()
         self._refrescar_resumen()
@@ -406,9 +421,9 @@ class AppInventario(tk.Tk):
 
         top = tk.Toplevel(self)
         top.title(titulo)
-        top.configure(bg=FONDO)
+        top.configure(bg=tema.FONDO)
         top.geometry("760x420")
-        caja = tk.Text(top, bg=PANEL, fg=TEXTO, font=("Consolas", 10),
+        caja = tk.Text(top, bg=tema.PANEL, fg=tema.TEXTO, font=("Consolas", 10),
                        relief="flat", wrap="none")
         caja.pack(fill="both", expand=True, padx=12, pady=12)
         caja.insert("1.0", contenido)
@@ -420,4 +435,4 @@ class AppInventario(tk.Tk):
 
 
 if __name__ == "__main__":
-    AppInventario().mainloop()
+    tema.ejecutar(AppInventario)

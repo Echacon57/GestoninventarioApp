@@ -20,7 +20,6 @@ from typing import TYPE_CHECKING
 import inventario
 import tema
 from inventario import MODO_ENTRADA, MODO_SALIDA, fmt
-from tema import AMBAR, CAMPO, COLOR_NIVEL, FONDO, PANEL, SUAVE, TEXTO, VERDE
 
 if TYPE_CHECKING:  # solo para el editor; importarlo de verdad seria circular
     from app import AppInventario
@@ -40,7 +39,7 @@ class VentanaManual(tk.Toplevel):
         self._personas: dict[str, str] = {}   # texto del combo -> codigo
 
         self.title("Registro manual de entradas y salidas")
-        self.configure(bg=FONDO)
+        self.configure(bg=tema.FONDO)
         self.geometry("920x600")
         self.minsize(740, 480)
         self.transient(app)
@@ -53,7 +52,7 @@ class VentanaManual(tk.Toplevel):
 
     def _construir(self) -> None:
         # --- operador y buscador
-        arriba = tk.Frame(self, bg=FONDO)
+        arriba = tk.Frame(self, bg=tema.FONDO)
         arriba.pack(fill="x", padx=16, pady=(14, 6))
 
         tema.titulo(arriba, "OPERADOR").pack(side="left", padx=(0, 8))
@@ -72,7 +71,7 @@ class VentanaManual(tk.Toplevel):
         tema.titulo(arriba, "BUSCAR").pack(side="right", padx=(16, 8))
 
         # --- lista de articulos
-        marco = tk.Frame(self, bg=FONDO)
+        marco = tk.Frame(self, bg=tema.FONDO)
         marco.pack(fill="both", expand=True, padx=16, pady=6)
         columnas = ("codigo", "nombre", "tipo", "disponible", "ubicacion")
         self.tabla = ttk.Treeview(marco, columns=columnas, show="headings",
@@ -90,38 +89,38 @@ class VentanaManual(tk.Toplevel):
         self.tabla.configure(yscrollcommand=barra.set)
         self.tabla.pack(side="left", fill="both", expand=True)
         barra.pack(side="right", fill="y")
-        self.tabla.tag_configure("FUERA", foreground="#f0a868")
+        self.tabla.tag_configure("FUERA", foreground=tema.TXT_SALIDA)
         self.tabla.bind("<<TreeviewSelect>>", lambda e: self._al_seleccionar())
 
         # --- seleccion, cantidad y botones
-        abajo = tk.Frame(self, bg=PANEL)
+        abajo = tk.Frame(self, bg=tema.PANEL)
         abajo.pack(fill="x", padx=16, pady=6)
 
         self.lbl_seleccion = tk.Label(abajo, text="Selecciona un articulo de la lista",
-                                      bg=PANEL, fg=SUAVE, anchor="w",
+                                      bg=tema.PANEL, fg=tema.SUAVE, anchor="w",
                                       font=("Segoe UI", 11, "bold"))
         self.lbl_seleccion.pack(side="left", fill="x", expand=True,
                                 padx=14, pady=12)
 
         tema.boton(abajo, "Registrar ENTRADA", lambda: self._registrar(MODO_ENTRADA),
-                   color=VERDE, font=("Segoe UI", 10, "bold")
+                   color=tema.VERDE, font=("Segoe UI", 10, "bold")
                    ).pack(side="right", padx=(4, 14), pady=10)
         tema.boton(abajo, "Registrar SALIDA", lambda: self._registrar(MODO_SALIDA),
-                   color=AMBAR, font=("Segoe UI", 10, "bold")
+                   color=tema.AMBAR, font=("Segoe UI", 10, "bold")
                    ).pack(side="right", padx=4, pady=10)
 
         self.cantidad = tk.StringVar(value="1")
         self.spin_cantidad = tk.Spinbox(
             abajo, from_=0.5, to=9999, increment=1, width=6,
             textvariable=self.cantidad, font=("Segoe UI", 14), justify="center",
-            bg=CAMPO, fg=TEXTO, relief="flat", buttonbackground=PANEL,
-            disabledbackground=PANEL, disabledforeground=SUAVE)
+            bg=tema.CAMPO, fg=tema.TEXTO, relief="flat", buttonbackground=tema.PANEL,
+            disabledbackground=tema.PANEL, disabledforeground=tema.SUAVE)
         self.spin_cantidad.pack(side="right", padx=(4, 12))
-        tk.Label(abajo, text="Cantidad", bg=PANEL, fg=SUAVE,
+        tk.Label(abajo, text="Cantidad", bg=tema.PANEL, fg=tema.SUAVE,
                  font=("Segoe UI", 9)).pack(side="right")
 
         # --- resultado del ultimo registro
-        self.resultado = tk.Label(self, text="", bg=FONDO, fg=TEXTO, anchor="w",
+        self.resultado = tk.Label(self, text="", bg=tema.FONDO, fg=tema.TEXTO, anchor="w",
                                   font=("Segoe UI", 11, "bold"), padx=14, pady=8)
         self.resultado.pack(fill="x", padx=16, pady=(0, 14))
 
@@ -168,11 +167,11 @@ class VentanaManual(tk.Toplevel):
         seleccion = self.tabla.selection()
         if not seleccion:
             self.lbl_seleccion.config(text="Selecciona un articulo de la lista",
-                                      fg=SUAVE)
+                                      fg=tema.SUAVE)
             self.spin_cantidad.config(state="normal")
             return
         valores = self.tabla.item(seleccion[0], "values")
-        self.lbl_seleccion.config(text=f"{valores[0]}  {valores[1]}", fg=TEXTO)
+        self.lbl_seleccion.config(text=f"{valores[0]}  {valores[1]}", fg=tema.TEXTO)
         # Una herramienta es pieza unica: la cantidad no aplica.
         if valores[2] == "Herramienta":
             self.cantidad.set("1")
@@ -207,9 +206,9 @@ class VentanaManual(tk.Toplevel):
         )
         self.app.tras_movimiento(resultado)
 
-        color = COLOR_NIVEL.get(resultado.nivel, PANEL)
+        color = tema.COLOR_NIVEL.get(resultado.nivel, tema.PANEL)
         self.resultado.config(
-            bg=color,
+            bg=color, fg=tema.color_texto_sobre(color),
             text=resultado.titulo + (f"   |   {resultado.detalle}"
                                      if resultado.detalle else ""))
         if resultado.ok:
