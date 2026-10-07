@@ -325,8 +325,6 @@ python admin.py compartir   # vuelve a publicar en la carpeta ya configurada
 
 ### Configurar la(s) computadora(s) que solo consultan
 
-Esa computadora **no necesita instalar nada con pip** — `visor.py` solo usa
-la librería estándar de Python (ver `requirements_visor.txt`). Solo necesita:
 
 1. Python instalado (con Tkinter; en Windows/Mac ya viene incluido).
 2. Copiar estos 5 archivos: `visor.py`, `inventario.py`, `snapshot.py`,
@@ -334,6 +332,7 @@ la librería estándar de Python (ver `requirements_visor.txt`). Solo necesita:
 3. Tener sincronizada la **misma carpeta** que configuraste en el paso
    anterior (por ejemplo, iniciar sesión con la misma cuenta de OneDrive, o
    una carpeta compartida contigo).
+4. Haber instalado requirements.txt como se mencionó anteriormente-  
 
 ```bash
 python visor.py
@@ -368,19 +367,3 @@ el Excel se salta con un aviso, sin errores feos.
   si la etiqueta se maltrata, se puede teclear a mano.
 - **El campo de escaneo recupera el foco solo**, incluso si alguien hace clic en
   otro lado de la ventana.
-
-## Si más adelante crece
-
-Para consultar el inventario desde otra computadora sin que nadie más
-escanee ahí, ve la sección 12 (`visor.py`) — no requiere instalar nada
-adicional ni tocar la arquitectura del proyecto.
-
-Si en cambio necesitas que **dos o más computadoras escaneen y escriban al
-mismo tiempo**, eso ya es un cambio de arquitectura real: SQLite (la base que
-usa este proyecto) no está pensada para que varias computadoras le escriban a
-la vez de forma segura, ni siquiera a través de una carpeta compartida — hay
-que levantar un pequeño servicio en una de las computadoras (o migrar a un
-motor como PostgreSQL) para que las demás le hablen por red en vez de abrir
-el archivo directamente. La lógica ya está separada de la interfaz
-(`inventario.py` no sabe nada de Tkinter), así que ese trabajo sería
-principalmente construir ese servicio, no reescribir el proyecto.
