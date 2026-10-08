@@ -235,8 +235,10 @@ class VisorInventario(tk.Tk):
 
         columnas_2 = tk.Frame(marco, bg=tema.FONDO)
         columnas_2.pack(fill="both", expand=True, padx=14, pady=(0, 14))
-        columnas_2.columnconfigure(0, weight=1)
-        columnas_2.columnconfigure(1, weight=1)
+        # "Fuera de la bodega" lleva mas columnas (persona, dias, valor):
+        # se le da mas ancho para que el valor se vea sin desplazar.
+        columnas_2.columnconfigure(0, weight=3, uniform="reportes")
+        columnas_2.columnconfigure(1, weight=2, uniform="reportes")
         columnas_2.rowconfigure(0, weight=1)
 
         self.texto_pendientes = self._caja_texto(columnas_2,
@@ -252,9 +254,19 @@ class VisorInventario(tk.Tk):
                   padx=(0, 8) if columna == 0 else (8, 0))
         tema.titulo(marco, titulo, bg=tema.PANEL).pack(anchor="w", padx=12,
                                                    pady=(10, 4))
-        caja = tk.Text(marco, bg=tema.CAMPO, fg=tema.TEXTO, font=("Consolas", 9),
+        cont = tk.Frame(marco, bg=tema.PANEL)
+        cont.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+        cont.rowconfigure(0, weight=1)
+        cont.columnconfigure(0, weight=1)
+        caja = tk.Text(cont, bg=tema.CAMPO, fg=tema.TEXTO, font=("Consolas", 9),
                        relief="flat", wrap="none", height=10)
-        caja.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+        caja.grid(row=0, column=0, sticky="nsew")
+        # Barras por si las lineas no caben en media ventana.
+        barra_v = ttk.Scrollbar(cont, orient="vertical", command=caja.yview)
+        barra_v.grid(row=0, column=1, sticky="ns")
+        barra_h = ttk.Scrollbar(cont, orient="horizontal", command=caja.xview)
+        barra_h.grid(row=1, column=0, sticky="ew")
+        caja.configure(yscrollcommand=barra_v.set, xscrollcommand=barra_h.set)
         caja.config(state="disabled")
         return caja
 
@@ -522,9 +534,9 @@ class VisorInventario(tk.Tk):
 
         pendientes = inventario.pendientes(self.con)
         texto = "\n".join(
-            f"{f['codigo']:<12} {f['nombre'][:26]:<26} {_quien(f)[:24]:<24} "
-            f"{f['dias'] or 0:>3}d  "
-            f"{fmt_dinero(f['valor']):>12}"
+            f"{f['codigo']:<9} {f['nombre'][:20]:<20} {_quien(f)[:22]:<22} "
+            f"{f['dias'] or 0:>3}d "
+            f"{fmt_dinero(f['valor']):>11}"
             for f in pendientes
         ) or "Nada fuera de la bodega."
         if pendientes:
@@ -537,7 +549,7 @@ class VisorInventario(tk.Tk):
 
         bajos = inventario.bajo_stock(self.con)
         texto2 = "\n".join(
-            f"{f['codigo']:<12} {f['nombre'][:26]:<26} "
+            f"{f['codigo']:<9} {f['nombre'][:24]:<24} "
             f"{fmt(f['existencia'])}/{fmt(f['minimo'])} {f['unidad']}"
             + (f" disp. ({fmt(f['prestado'])} prestadas)"
                if f["tipo"] == "AGRUPADO" else "")

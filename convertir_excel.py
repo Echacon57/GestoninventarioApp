@@ -81,6 +81,7 @@ PALABRAS_MATERIAL = [
     "cinta de aislar", "cinta teflon", "cinta masking", "pintura", "thinner",
     "solvente", "silicon", "pegamento", "resistol", "lija", "disco de corte",
     "soldadura", "electrodo", "terminal", "grapa", "material", "consumible",
+    "disco", "discos", "broca", "brocas", "guante", "guantes",
 ]
 
 # Unidades de material. Con cualquiera de estas, una cantidad > 1 es

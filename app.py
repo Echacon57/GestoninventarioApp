@@ -409,7 +409,7 @@ class AppInventario(tk.Tk):
         else:
             # Un AGRUPADO sale una vez por persona: "2 con Emerson ..."
             lineas = [
-                f"{f['codigo']:<12} {f['nombre'][:30]:<30} {_quien(f)[:26]:<26} "
+                f"{f['codigo']:<12} {f['nombre'][:24]:<24} {_quien(f)[:22]:<22} "
                 f"{f['dias'] or 0:>3} dia(s)  "
                 f"{inventario.fmt_dinero(f['valor']):>12}"
                 for f in filas[:40]
@@ -460,9 +460,19 @@ class AppInventario(tk.Tk):
         top.title(titulo)
         top.configure(bg=tema.FONDO)
         top.geometry("760x420")
-        caja = tk.Text(top, bg=tema.PANEL, fg=tema.TEXTO, font=("Consolas", 10),
+        marco = tk.Frame(top, bg=tema.FONDO)
+        marco.pack(fill="both", expand=True, padx=12, pady=12)
+        marco.rowconfigure(0, weight=1)
+        marco.columnconfigure(0, weight=1)
+        caja = tk.Text(marco, bg=tema.PANEL, fg=tema.TEXTO, font=("Consolas", 10),
                        relief="flat", wrap="none")
-        caja.pack(fill="both", expand=True, padx=12, pady=12)
+        caja.grid(row=0, column=0, sticky="nsew")
+        # Barras por si alguna linea o la lista no caben en la ventana.
+        barra_v = ttk.Scrollbar(marco, orient="vertical", command=caja.yview)
+        barra_v.grid(row=0, column=1, sticky="ns")
+        barra_h = ttk.Scrollbar(marco, orient="horizontal", command=caja.xview)
+        barra_h.grid(row=1, column=0, sticky="ew")
+        caja.configure(yscrollcommand=barra_v.set, xscrollcommand=barra_h.set)
         caja.insert("1.0", contenido)
         caja.config(state="disabled")
         top.transient(self)
@@ -500,6 +510,9 @@ class DialogoAgrupado(tk.Toplevel):
         # El gatillo a veces dispara doble: un Enter que llegue antes de
         # REBOTE_SEG no debe aceptar el dialogo con los valores por omision.
         self.abierto_en = time.monotonic()
+        # Momentos de las ultimas teclas: el lector escribe un codigo entero
+        # y un Enter en una rafaga; ese Enter no debe aceptar el dialogo.
+        self._teclas: list[float] = []
 
         art = inventario.buscar_articulo(app.con, codigo)
         prestamos = inventario.prestamos_de(app.con, codigo)
@@ -593,6 +606,7 @@ class DialogoAgrupado(tk.Toplevel):
         self._ajustar()
         self.bind("<Return>", self._al_enter)
         self.bind("<KP_Enter>", self._al_enter)
+        self.bind("<Key>", self._anotar_tecla)
         self.bind("<Escape>", lambda e: self.cerrar(None))
         self.protocol("WM_DELETE_WINDOW", lambda: self.cerrar(None))
         # El foco va al dialogo, no a la cantidad: si el lector dispara de
@@ -611,9 +625,16 @@ class DialogoAgrupado(tk.Toplevel):
         else:
             self.fila_de.pack_forget()
 
+    def _anotar_tecla(self, _evento=None) -> None:
+        ahora = time.monotonic()
+        self._teclas = [t for t in self._teclas if ahora - t < 0.5] + [ahora]
+
     def _al_enter(self, _evento=None) -> None:
         if time.monotonic() - self.abierto_en < REBOTE_SEG:
             return  # Enter del mismo disparo del lector, se ignora
+        ahora = time.monotonic()
+        if sum(1 for t in self._teclas if ahora - t < 0.5) >= 4:
+            return  # ráfaga de teclas + Enter = otro código leído por el lector
         self.aceptar()
 
     def aceptar(self) -> None:

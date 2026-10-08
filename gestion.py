@@ -168,7 +168,7 @@ class FichaArticulos(tk.Frame):
                            bg=tema.PANEL, fg=tema.TEXTO, selectcolor=tema.CAMPO, bd=0,
                            activebackground=tema.PANEL, activeforeground=tema.TEXTO,
                            font=("Segoe UI", 10), highlightthickness=0,
-                           anchor="w", justify="left", wraplength=230
+                           anchor="w", justify="left", wraplength=190
                            ).pack(anchor="w")
         fila += 1
 

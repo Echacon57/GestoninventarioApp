@@ -83,9 +83,34 @@ la bodega" es, en la práctica, la forma de ver todo lo que anda prestado en
 ese momento — junto con su valor total, que se muestra abajo a la derecha de
 la lista.
 
-Al elegir *Herramienta (pieza única)* los campos de cantidad se bloquean solos,
-porque una herramienta no lleva existencia ni mínimo. Al elegir *Material (con
-cantidad)* se habilitan.
+Hay tres tipos de artículo (debajo del selector hay una línea de ayuda que
+explica el elegido):
+
+| Tipo | Para qué | Al escanear |
+|---|---|---|
+| *Herramienta única (1 pieza)* | Una pieza con su propia etiqueta (un taladro, un multímetro) | Alterna entre prestada y en bodega |
+| *Herramienta con cantidad (varias iguales, se devuelven)* | Varias piezas iguales con **una sola etiqueta** (5 extensiones, 3 cintas de medir, 2 rotomartillos idénticos) | Aparece un diálogo para **sacar o regresar** cuántas |
+| *Material (se gasta)* | Cable, taquetes, discos… | Descuenta (o suma) existencia; no se espera que regrese |
+
+Con *Herramienta única* los campos de cantidad se bloquean solos, porque no
+lleva existencia ni mínimo. Con los otros dos se habilitan; en una
+herramienta con cantidad el campo se llama *"Disponibles en bodega"*.
+
+**Herramienta con cantidad, en detalle.** El sistema registra quién tiene
+cuántas piezas: al escanearla se abre un diálogo pequeño con las piezas
+disponibles y quién tiene las demás; se elige *Sacar* o *Regresar* y la
+cantidad (y, al regresar, de quién son las piezas, porque cualquiera puede
+devolver lo de otro). No deja sacar más de las disponibles ni regresar más de
+lo que esa persona tiene. En la lista se ve como `3 disp. / 2 fuera`, aparece
+en *Pendientes* y en el filtro "Fuera de la bodega" una línea por persona
+(`2 con Emerson…`), y **su valor total no cambia al prestar**: solo pasa de
+"Valor en bodega" a "Prestado".
+
+Si cambias el tipo de un artículo que ya tiene movimientos a *Herramienta con
+cantidad*, el sistema reconstruye quién tiene piezas a partir del historial
+(salidas menos entradas de cada persona), te muestra el resumen y pide
+confirmación antes de guardar; la existencia no se toca. Al revés no deja
+cambiarlo mientras haya piezas prestadas.
 
 Marca, modelo, número de serie y valor unitario son opcionales: llénalos si
 te sirven para identificar el equipo o para saber cuánto vale lo que hay en
@@ -108,12 +133,15 @@ el registro de quién la tuvo.
 
 | Prefijo | Qué es | Comportamiento al escanear |
 |---|---|---|
-| `HER-0001` | Herramienta o artículo **único** | Alterna entre salida y entrada |
+| `HER-0001` | Herramienta **única** o herramienta **con cantidad** | Única: alterna entre salida y entrada. Con cantidad: diálogo para sacar o regresar cuántas |
 | `MAT-0001` | Material **consumible** con cantidad | Descuenta o suma existencia |
 | `PER-0001` | Gafete de operador | No mueve inventario, solo fija quién está usando el sistema |
 
 Los códigos se asignan solos y de forma consecutiva. También puedes forzar uno
-propio si ya tienes etiquetas hechas.
+propio si ya tienes etiquetas hechas. Una herramienta con cantidad lleva
+**una sola etiqueta** para todo el grupo. Si conviertes un material ya
+existente (por ejemplo `MAT-0131`) en herramienta con cantidad, conserva su
+código.
 
 ## 7. El flujo diario
 
@@ -124,7 +152,9 @@ propio si ya tienes etiquetas hechas.
 4. `Esc` borra el operador activo para que el siguiente empiece limpio.
 
 Para consumibles, pon la cantidad en la casilla de la derecha **antes** de
-escanear. Vuelve sola a 1 después de cada lectura.
+escanear. Vuelve sola a 1 después de cada lectura. Las herramientas con
+cantidad abren su propio diálogo (Sacar / Regresar, cantidad y de quién);
+`Enter` acepta y `Esc` cancela.
 
 ### Modos
 
@@ -173,8 +203,13 @@ Listo: 283 articulo(s) escritos en Mi Inventario.csv
 Reglas que aplica automáticamente (ajustables editando `ALIAS` al inicio del
 script si tu Excel usa otros nombres de columna):
 
-- **Tipo:** si la cantidad es mayor a 1, el artículo entra como *material con
-  cantidad*; si es 1 (o no viene), entra como *herramienta única*.
+- **Tipo:** si la cantidad es 1 (o no viene), entra como *herramienta
+  única*. Si es mayor a 1 y parece material (unidad como m, kg, rollo, caja,
+  o una palabra de `PALABRAS_MATERIAL` en el nombre o categoría: cable,
+  taquete, disco, broca…), entra como *material*. Si es mayor a 1 en piezas y
+  no parece material, entra como *herramienta con cantidad*; como eso es una
+  suposición, esas filas llevan `si` en la columna `revisar` del CSV y se
+  listan al final para que las confirmes.
 - **Código:** si la fila ya traía uno, se conserva tal cual (así lo que ya
   esté anotado en otros documentos sigue sirviendo). Si está vacío o
   repetido, se deja en blanco y el sistema le asigna uno nuevo al importar.
@@ -341,6 +376,11 @@ python visor.py
 La primera vez te pide elegir esa carpeta; después la recuerda. Tiene un
 botón "Actualizar ahora" y se refresca solo cada minuto.
 
+Si la computadora que escanea todavía tiene una versión anterior del
+programa, la foto que publica no trae la tabla `prestamos` (herramientas con
+cantidad). El visor la abre igual, sin errores, y avisa discretamente en la
+barra de arriba ("foto de una versión anterior").
+
 La pestaña **"Movimientos"** muestra los últimos movimientos en orden, con
 fecha, cantidad exacta y quién los hizo, y se puede filtrar por código,
 artículo u operador. Sirve sobre todo para los materiales que se retiran en
@@ -360,7 +400,13 @@ el Excel se salta con un aviso, sin errores feos.
 ## Detalles que ahorran problemas
 
 - **Doble lectura:** el gatillo a veces dispara dos veces. La app ignora el
-  mismo código si llega dos veces en menos de 1.2 segundos.
+  mismo código si llega dos veces en menos de 1.2 segundos. Con el diálogo
+  de una herramienta con cantidad abierto, si se escanea otro código su
+  `Enter` tampoco acepta el diálogo: solo un `Enter` tecleado a mano.
+- **Modo claro / oscuro:** el botón *"Modo claro"* / *"Modo oscuro"* de la
+  ventana de escaneo y del visor cambia los colores al instante. La
+  preferencia se guarda en `datos/tema.txt` y todas las ventanas abren con
+  ella la próxima vez.
 - **Etiquetas:** protégelas con cinta transparente o lamínalas. En bodega, el
   papel sin proteger dura semanas.
 - **Siempre imprime el código en texto** debajo de las barras (ya viene así):

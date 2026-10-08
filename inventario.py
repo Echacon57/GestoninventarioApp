@@ -192,7 +192,8 @@ def ultimos_movimientos(con: sqlite3.Connection, limite: int = 25,
 def pendientes(con: sqlite3.Connection, dias: int = 0) -> list[sqlite3.Row]:
     """Articulos que estan fuera de la bodega, con quien los saco y desde cuando.
 
-    Un UNICO (o consumible agotado) sale en una sola fila. Un AGRUPADO sale
+    Un UNICO sale en una sola fila (un consumible agotado no: no esta
+    prestado, se gasto). Un AGRUPADO sale
     una vez por cada persona que tiene piezas, con su 'cantidad'. Todas las
     filas traen 'valor' = lo que vale lo que esta fuera en esa linea.
     """
@@ -212,7 +213,7 @@ def pendientes(con: sqlite3.Connection, dias: int = 0) -> list[sqlite3.Row]:
             ORDER BY id DESC LIMIT 1
         )
         LEFT JOIN personas p ON p.codigo = m.persona
-        WHERE a.estado = 'FUERA' AND a.activo = 1 AND a.tipo <> 'AGRUPADO'
+        WHERE a.estado = 'FUERA' AND a.activo = 1 AND a.tipo = 'UNICO'
           AND CAST(julianday('now','localtime') - julianday(COALESCE(m.fecha,
               datetime('now','localtime'))) AS INTEGER) >= ?
     """
@@ -596,7 +597,7 @@ def tiene_pendientes(con: sqlite3.Connection, codigo_persona: str) -> list[sqlit
     codigo_persona = codigo_persona.strip().upper()
     sql = """
         SELECT a.codigo, a.nombre FROM articulos a
-        WHERE a.estado = 'FUERA' AND a.activo = 1 AND a.tipo <> 'AGRUPADO' AND (
+        WHERE a.estado = 'FUERA' AND a.activo = 1 AND a.tipo = 'UNICO' AND (
             SELECT m.persona FROM movimientos m
             WHERE m.codigo = a.codigo AND m.tipo = 'SALIDA'
             ORDER BY m.id DESC LIMIT 1) = ?
