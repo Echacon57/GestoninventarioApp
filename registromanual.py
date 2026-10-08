@@ -145,6 +145,9 @@ class VentanaManual(tk.Toplevel):
             if art["tipo"] == "UNICO":
                 tipo = "Herramienta"
                 disponible = "En bodega" if art["estado"] == "EN_BODEGA" else "Fuera"
+            elif art["tipo"] == "AGRUPADO":
+                tipo = "Con cantidad"
+                disponible = inventario.texto_existencia(art)
             else:
                 tipo = "Material"
                 disponible = f"{fmt(art['existencia'])} {art['unidad']}"
@@ -200,12 +203,29 @@ class VentanaManual(tk.Toplevel):
                                    "Escribe una cantidad numerica.", parent=self)
             return
 
+        # Herramienta con cantidad: el mismo dialogo que al escanear, para
+        # elegir cuantas y, al regresar, de quien son.
+        if self.tabla.item(seleccion[0], "values")[2] == "Con cantidad":
+            self.app.abrir_agrupado(seleccion[0], modo, cantidad=cantidad,
+                                    operador=persona, padre=self,
+                                    nota="registro manual",
+                                    al_terminar=self._tras_agrupado)
+            return
+
         resultado = inventario.registrar_escaneo(
             self.con, seleccion[0], persona=persona, modo=modo, cantidad=cantidad,
             nota="registro manual",
         )
         self.app.tras_movimiento(resultado)
+        self._mostrar_resultado(resultado)
 
+    def _tras_agrupado(self, resultado) -> None:
+        if resultado is not None:
+            self._mostrar_resultado(resultado)
+        else:
+            self._filtrar()
+
+    def _mostrar_resultado(self, resultado) -> None:
         color = tema.COLOR_NIVEL.get(resultado.nivel, tema.PANEL)
         self.resultado.config(
             bg=color, fg=tema.color_texto_sobre(color),

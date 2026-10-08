@@ -109,7 +109,7 @@ class FichaArticulos(tk.Frame):
         titulos = {"codigo": "Codigo", "nombre": "Nombre", "tipo": "Tipo",
                    "exist": "Exist.", "ubicacion": "Ubicacion",
                    "estado": "Estado"}
-        anchos = {"codigo": 80, "nombre": 196, "tipo": 86, "exist": 78,
+        anchos = {"codigo": 80, "nombre": 196, "tipo": 86, "exist": 112,
                   "ubicacion": 100, "estado": 78}
         self.tabla = ttk.Treeview(izq, columns=columnas, show="headings")
         for col in columnas:
@@ -156,18 +156,28 @@ class FichaArticulos(tk.Frame):
 
         tk.Label(self.der, text="Tipo", bg=tema.PANEL, fg=tema.SUAVE,
                  font=("Segoe UI", 9, "bold")).grid(row=fila, column=0,
-                                                    sticky="w", padx=16)
+                                                    sticky="nw", padx=16,
+                                                    pady=(3, 0))
         self.tipo = tk.StringVar(value="UNICO")
         marco_tipo = tk.Frame(self.der, bg=tema.PANEL)
         marco_tipo.grid(row=fila, column=1, sticky="w", padx=(0, 16), pady=3)
-        for valor, texto in (("UNICO", "Herramienta (pieza unica)"),
-                             ("CONSUMIBLE", "Material (con cantidad)")):
-            tk.Radiobutton(marco_tipo, text=texto, value=valor,
+        for valor in inventario.TIPOS:
+            tk.Radiobutton(marco_tipo, text=inventario.NOMBRE_TIPO[valor],
+                           value=valor,
                            variable=self.tipo, command=self._ajustar_tipo,
                            bg=tema.PANEL, fg=tema.TEXTO, selectcolor=tema.CAMPO, bd=0,
                            activebackground=tema.PANEL, activeforeground=tema.TEXTO,
                            font=("Segoe UI", 10), highlightthickness=0,
-                           anchor="w").pack(anchor="w")
+                           anchor="w", justify="left", wraplength=230
+                           ).pack(anchor="w")
+        fila += 1
+
+        # Linea de ayuda: explica el tipo elegido.
+        self.ayuda_tipo = tk.Label(self.der, text="", bg=tema.PANEL,
+                                   fg=tema.SUAVE, font=("Segoe UI", 9),
+                                   anchor="w", justify="left", wraplength=320)
+        self.ayuda_tipo.grid(row=fila, column=0, columnspan=2, sticky="ew",
+                             padx=16, pady=(0, 6))
         fila += 1
 
         self.categoria = self._combo("Categoria", fila); fila += 1
@@ -219,10 +229,11 @@ class FichaArticulos(tk.Frame):
                                padx=16, pady=(0, 16))
 
     def _campo(self, etiqueta: str, fila: int) -> tk.Entry:
-        tk.Label(self.der, text=etiqueta, bg=tema.PANEL, fg=tema.SUAVE,
-                 font=("Segoe UI", 9, "bold")).grid(row=fila, column=0,
-                                                    sticky="w", padx=16)
+        rotulo = tk.Label(self.der, text=etiqueta, bg=tema.PANEL, fg=tema.SUAVE,
+                          font=("Segoe UI", 9, "bold"))
+        rotulo.grid(row=fila, column=0, sticky="w", padx=16)
         campo = tema.entrada(self.der)
+        campo.rotulo = rotulo  # para cambiar el texto segun el tipo
         campo.grid(row=fila, column=1, sticky="ew", padx=(0, 16), pady=3,
                    ipady=3)
         return campo
@@ -270,18 +281,20 @@ class FichaArticulos(tk.Frame):
             estado=estado_map.get(self.filtro_estado.get(), ""),
             ubicacion="" if ubic in ("", "Todas") else ubic)
         for f in filas:
+            prestado = f["tipo"] == "AGRUPADO" and f["prestado"] > 0
             etiquetas_fila = []
             if not f["activo"]:
                 etiquetas_fila.append("baja")
-            elif f["estado"] == "FUERA":
+            elif f["estado"] == "FUERA" or prestado:
                 etiquetas_fila.append("fuera")
             estado = ("baja" if not f["activo"]
+                      else "parcial" if prestado and f["estado"] == "EN_BODEGA"
                       else "bodega" if f["estado"] == "EN_BODEGA" else "fuera")
             self.tabla.insert(
                 "", "end", iid=f["codigo"],
                 values=(f["codigo"], f["nombre"],
-                        "herram." if f["tipo"] == "UNICO" else "material",
-                        f"{fmt(f['existencia'])} {f['unidad']}".strip(),
+                        inventario.TIPO_CORTO.get(f["tipo"], f["tipo"]),
+                        inventario.texto_existencia(f),
                         f["ubicacion"], estado),
                 tags=tuple(etiquetas_fila))
         valor_total = sum(inventario.valor_articulo(f) for f in filas)
@@ -338,9 +351,15 @@ class FichaArticulos(tk.Frame):
         activo = bool(art["activo"])
         self.btn_baja.config(text="Dar de baja" if activo else "Reactivar",
                              bg=tema.ROJO if activo else tema.VERDE)
-        self.aviso.config(
-            text="" if activo else "Este articulo esta dado de baja: el "
-                                   "escaner lo rechaza hasta que lo reactives.")
+        texto_aviso = "" if activo else ("Este articulo esta dado de baja: el "
+                                         "escaner lo rechaza hasta que lo reactives.")
+        if art["tipo"] == "AGRUPADO" and art["prestado"] > 0:
+            quienes = ", ".join(f"{p['nombre']} ({fmt(p['cantidad'])})"
+                                for p in inventario.prestamos_de(self.con, codigo))
+            texto_aviso = (f"Prestadas: {fmt(art['prestado'])}  ·  {quienes}  ·  "
+                           f"total {fmt(art['existencia'] + art['prestado'])}"
+                           + (f"\n{texto_aviso}" if texto_aviso else ""))
+        self.aviso.config(text=texto_aviso, fg=tema.TXT_AVISO)
         self._ajustar_tipo()
 
     def limpiar(self) -> None:
@@ -386,14 +405,29 @@ class FichaArticulos(tk.Frame):
         if self.al_cambiar:
             self.al_cambiar()
 
+    AYUDA_TIPO = {
+        "UNICO": "Una sola pieza con su propia etiqueta. Al escanearla se "
+                 "alterna entre prestada y en bodega.",
+        "AGRUPADO": "Varias piezas iguales con UNA etiqueta (extensiones, "
+                    "cintas de medir...). Al escanear se elige cuantas se "
+                    "sacan o regresan y queda registrado quien las tiene. "
+                    "Existencia = piezas disponibles en bodega.",
+        "CONSUMIBLE": "Material que se gasta (cable, taquetes...). Al sacarlo "
+                      "baja la existencia y no se espera que regrese.",
+    }
+
     def _ajustar_tipo(self) -> None:
         """Una herramienta unica no lleva cantidad ni minimo: se bloquean."""
-        es_consumible = self.tipo.get() == "CONSUMIBLE"
-        estado = "normal" if es_consumible else "disabled"
+        tipo = self.tipo.get()
+        con_cantidad = tipo in ("CONSUMIBLE", "AGRUPADO")
+        self.ayuda_tipo.config(text=self.AYUDA_TIPO.get(tipo, ""))
+        self.existencia.rotulo.config(
+            text="Disponibles en bodega" if tipo == "AGRUPADO" else "Existencia")
+        estado = "normal" if con_cantidad else "disabled"
         for campo in (self.unidad, self.existencia, self.minimo):
             campo.config(state=estado,
                          disabledbackground=tema.PANEL, disabledforeground=tema.SUAVE)
-        if not es_consumible and self.codigo_actual is None:
+        if not con_cantidad and self.codigo_actual is None:
             for campo, valor in ((self.unidad, "pza"), (self.existencia, "1"),
                                  (self.minimo, "0")):
                 self._poner(campo, valor)
@@ -410,7 +444,7 @@ class FichaArticulos(tk.Frame):
 
         tipo = self.tipo.get()
         try:
-            if tipo == "CONSUMIBLE":
+            if tipo in ("CONSUMIBLE", "AGRUPADO"):
                 existencia = float((self.existencia.get() or "0").replace(",", "."))
                 minimo = float((self.minimo.get() or "0").replace(",", "."))
                 unidad = self.unidad.get().strip() or "pza"
@@ -423,6 +457,24 @@ class FichaArticulos(tk.Frame):
                                    "Existencia, minimo y valor unitario deben "
                                    "ser numeros.", parent=self)
             return
+        if min(existencia or 0, minimo, valor_unitario) < 0:
+            messagebox.showwarning("Cantidad invalida",
+                                   "Existencia, minimo y valor unitario no "
+                                   "pueden ser negativos.", parent=self)
+            return
+
+        # Cambio de tipo de un articulo que ya existe: se avisa que pasara
+        # (por ejemplo, los prestamos que se reconstruyen) y se confirma.
+        if self.codigo_actual is not None:
+            permitido, mensaje, confirmar = inventario.resumen_cambio_tipo(
+                self.con, self.codigo_actual, tipo)
+            if not permitido:
+                messagebox.showwarning("No se puede cambiar el tipo", mensaje,
+                                       parent=self)
+                return
+            if confirmar and not messagebox.askyesno("Cambiar tipo", mensaje,
+                                                     parent=self):
+                return
 
         datos = dict(nombre=nombre, tipo=tipo,
                      categoria=self.categoria.get().strip(),
@@ -450,7 +502,12 @@ class FichaArticulos(tk.Frame):
         else:
             if existencia is not None:
                 datos["existencia"] = existencia
-            inventario.actualizar_articulo(self.con, self.codigo_actual, **datos)
+            try:
+                inventario.actualizar_articulo(self.con, self.codigo_actual,
+                                               **datos)
+            except ValueError as err:
+                messagebox.showwarning("No se guardo", str(err), parent=self)
+                return
             codigo = self.codigo_actual
             self.refrescar()
             self.cargar(codigo)
@@ -468,6 +525,9 @@ class FichaArticulos(tk.Frame):
             extra = ""
             if art["estado"] == "FUERA": # type: ignore
                 extra = "\n\nOjo: ahora mismo esta FUERA de la bodega."
+            if art["tipo"] == "AGRUPADO" and art["prestado"] > 0: # type: ignore
+                extra = (f"\n\nOjo: tiene {fmt(art['prestado'])} pieza(s) " # type: ignore
+                         "prestadas que dejaran de verse en Pendientes.")
             if not messagebox.askyesno(
                     "Dar de baja",
                     f"¿Dar de baja {art['nombre']}?\n\n" # type: ignore

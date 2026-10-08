@@ -21,9 +21,16 @@ Reglas de conversion (ajusta AJUSTES abajo si tu caso es distinto):
   - El codigo original se conserva tal cual si existe. Si esta vacio o
     duplicado, se deja en blanco y el sistema le asigna uno nuevo (HER-/MAT-)
     al importar.
-  - Un articulo se marca CONSUMIBLE (con cantidad) si su Cant. Total es
-    mayor a 1; si es 1 o no viene especificada, se trata como UNICO
+  - Si Cant. Total es 1 o no viene especificada, se trata como UNICO
     (herramienta individual con su propio codigo).
+  - Si es mayor a 1 y parece material (su unidad es de material, como m,
+    kg o rollo, o el nombre/categoria tiene una palabra de PALABRAS_MATERIAL)
+    se marca CONSUMIBLE (material que se gasta).
+  - Si es mayor a 1, la unidad es "pza" (o no viene) y no parece material,
+    se marca AGRUPADO (varias herramientas iguales que se prestan y se
+    devuelven, con una sola etiqueta). Como es una suposicion, esas filas
+    llevan "si" en la columna 'revisar' y se listan al final para que las
+    confirmes.
   - Si "Cant. Total" viene vacia se asume 1 y se anota en observaciones
     para que lo confirmes despues.
   - Valores como "N/A", "F/S", "-" en marca/modelo/serie/categoria se
@@ -57,12 +64,41 @@ ALIAS = {
     "estatus": ["estatus", "status", "disponibilidad"],
     "existencia": ["cant. total", "cantidad", "existencia", "cant total",
                    "cant"],
+    "unidad": ["unidad", "unidad de medida", "u.m.", "um", "medida"],
     "valor_unitario": ["valor unitario ($)", "valor unitario", "costo",
                        "precio unitario", "precio"],
     "notas": ["observaciones", "notas", "comentarios"],
 }
 
 PLACEHOLDER = {"n/a", "na", "f/s", "fs", "-", "", "s/n", "sin dato"}
+
+# Palabras que delatan MATERIAL (se gasta) en el nombre o la categoria, sin
+# acentos y en minusculas. Agrega o quita las que hagan falta. Ojo con las
+# muy generales: "cinta" sola tambien atraparia la cinta de medir.
+PALABRAS_MATERIAL = [
+    "cable", "alambre", "tornillo", "taquete", "pija", "rondana", "tuerca",
+    "clavo", "remache", "abrazadera", "cincho", "cinta aislante",
+    "cinta de aislar", "cinta teflon", "cinta masking", "pintura", "thinner",
+    "solvente", "silicon", "pegamento", "resistol", "lija", "disco de corte",
+    "soldadura", "electrodo", "terminal", "grapa", "material", "consumible",
+]
+
+# Unidades de material. Con cualquiera de estas, una cantidad > 1 es
+# CONSUMIBLE aunque el nombre no lo diga.
+UNIDADES_MATERIAL = {
+    "m", "mt", "mts", "metro", "metros", "kg", "kgs", "kilo", "kilos", "g",
+    "gr", "l", "lt", "lts", "litro", "litros", "rollo", "rollos", "caja",
+    "cajas", "paquete", "paquetes", "bolsa", "bolsas", "galon", "galones",
+    "cubeta", "cubetas", "saco", "sacos", "bulto", "bultos", "ml", "cm",
+}
+
+# Unidades de "pieza": con estas (o sin unidad) puede ser AGRUPADO.
+UNIDADES_PIEZA = {"", "pza", "pzas", "pz", "pzs", "pieza", "piezas", "u",
+                  "unidad", "unidades"}
+
+_REGEX_MATERIAL = re.compile(
+    r"\b(" + "|".join(re.escape(p) for p in PALABRAS_MATERIAL) + r")",
+    re.IGNORECASE)
 
 REGEX_NO_FUNCIONA = re.compile(r"no\s+funcion|fuera\s+de\s+servicio|"
                                r"da(ñ|n)ad|inservible", re.IGNORECASE)
@@ -79,6 +115,21 @@ def _limpio(valor) -> str:
         return ""
     texto = str(valor).strip()
     return "" if _normalizar(texto) in PLACEHOLDER else texto
+
+
+def tipo_por_cantidad(existencia: float, unidad: str, nombre: str,
+                      categoria: str = "") -> str:
+    """UNICO, AGRUPADO o CONSUMIBLE segun la cantidad, unidad y nombre."""
+    if existencia <= 1:
+        return "UNICO"
+    unidad_n = _normalizar(unidad).rstrip(".")
+    if unidad_n in UNIDADES_MATERIAL:
+        return "CONSUMIBLE"
+    if _REGEX_MATERIAL.search(_normalizar(f"{nombre} {categoria}")):
+        return "CONSUMIBLE"
+    if unidad_n in UNIDADES_PIEZA:
+        return "AGRUPADO"
+    return "CONSUMIBLE"  # unidad rara (juego, par...): se trata como material
 
 
 def _mapear_columnas(columnas_excel: list[str]) -> dict[str, str]:
@@ -141,6 +192,7 @@ def convertir(ruta_excel: Path, hoja: str | int = 0,
     codigos_duplicados = 0
     sin_cantidad = 0
     dados_de_baja = 0
+    agrupados: list[str] = []
 
     for _, fila in df.iterrows():
         nombre = _limpio(val(fila, "nombre"))
@@ -169,7 +221,12 @@ def convertir(ruta_excel: Path, hoja: str | int = 0,
                 sin_cantidad += 1
                 obs = (obs + " " if obs else "") + "(cantidad no especificada, verificar)"
 
-        tipo = "CONSUMIBLE" if existencia > 1 else "UNICO"
+        unidad = _limpio(val(fila, "unidad")) or "pza"
+        tipo = tipo_por_cantidad(existencia, unidad, nombre, categoria)
+        revisar = ""
+        if tipo == "AGRUPADO":
+            revisar = "si"
+            agrupados.append(f"{nombre} ({existencia:g} {unidad})")
 
         valor_crudo = val(fila, "valor_unitario", 0)
         try:
@@ -203,7 +260,7 @@ def convertir(ruta_excel: Path, hoja: str | int = 0,
             "tipo": tipo,
             "categoria": categoria,
             "ubicacion": ubicacion,
-            "unidad": "pza",
+            "unidad": unidad,
             "existencia": existencia,
             "minimo": 0,
             "marca": marca,
@@ -212,6 +269,7 @@ def convertir(ruta_excel: Path, hoja: str | int = 0,
             "valor_unitario": valor_unitario,
             "notas": notas,
             "activo": activo,
+            "revisar": revisar,
         })
 
     if sin_cantidad:
@@ -220,6 +278,13 @@ def convertir(ruta_excel: Path, hoja: str | int = 0,
     if codigos_duplicados:
         avisos.append(f"{codigos_duplicados} codigo(s) repetido(s) en el Excel: "
                       f"se les asignara uno nuevo al importar.")
+    if agrupados:
+        avisos.append(
+            f"{len(agrupados)} articulo(s) se marcaron AGRUPADO (herramienta "
+            "con cantidad que se presta y se devuelve) porque tienen mas de 1 "
+            "pieza y no parecen material. Confirmalos (columna 'revisar' = "
+            "si); si alguno es material, cambia su tipo a CONSUMIBLE:\n      "
+            + "\n      ".join(agrupados))
     if dados_de_baja:
         avisos.append(f"{dados_de_baja} articulo(s) se marcan dados de baja "
                       f"(la descripcion u observaciones dicen que no funcionan).")

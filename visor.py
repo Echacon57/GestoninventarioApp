@@ -139,7 +139,7 @@ class VisorInventario(tk.Tk):
         titulos = {"codigo": "Codigo", "nombre": "Nombre", "tipo": "Tipo",
                    "exist": "Exist.", "ubicacion": "Ubicacion",
                    "estado": "Estado"}
-        anchos = {"codigo": 80, "nombre": 220, "tipo": 90, "exist": 80,
+        anchos = {"codigo": 80, "nombre": 220, "tipo": 90, "exist": 112,
                   "ubicacion": 110, "estado": 84}
         izq = tk.Frame(marco, bg=tema.FONDO)
         izq.grid(row=2, column=0, sticky="nsew", padx=(14, 8), pady=(0, 14))
@@ -280,10 +280,21 @@ class VisorInventario(tk.Tk):
                      font=("Segoe UI", 9, "bold"), anchor="w").pack(
                 fill="x", padx=16, pady=(0, 8))
 
+        if art["tipo"] == "AGRUPADO":
+            prestamos = inventario.prestamos_de(self.con, art["codigo"])
+            existencia = [
+                ("Disponibles", f"{fmt(art['existencia'])} {art['unidad']}"),
+                ("Prestadas", ", ".join(f"{p['nombre']} ({fmt(p['cantidad'])})"
+                                        for p in prestamos) or "ninguna"),
+                ("Total", f"{fmt(art['existencia'] + art['prestado'])} "
+                          f"{art['unidad']}"),
+            ]
+        else:
+            existencia = [("Existencia", f"{fmt(art['existencia'])} {art['unidad']}")]
         campos = [
-            ("Tipo", "herramienta" if art["tipo"] == "UNICO" else "material"),
+            ("Tipo", inventario.NOMBRE_TIPO.get(art["tipo"], art["tipo"])),
             ("Estado", "en bodega" if art["estado"] == "EN_BODEGA" else "fuera"),
-            ("Existencia", f"{fmt(art['existencia'])} {art['unidad']}"),
+            *existencia,
             ("Categoria", art["categoria"] or "—"),
             ("Ubicacion", art["ubicacion"] or "—"),
             ("Marca", art["marca"] or "—"),
@@ -403,6 +414,9 @@ class VisorInventario(tk.Tk):
             self.con.close()
         self.con = snapshot.conectar_solo_lectura(ruta_cache)
         self.momento_datos = momento
+        # Una foto publicada por una version anterior no trae la tabla de
+        # prestamos: se muestra igual, solo sin herramientas con cantidad.
+        self.foto_vieja = not inventario.tiene_tabla_prestamos(self.con)
 
         self._cargar_ubicaciones()
         self._refrescar_lista()
@@ -424,9 +438,11 @@ class VisorInventario(tk.Tk):
             color = tema.TXT_ERROR
         elif antiguedad.total_seconds() > 10 * 60:
             color = tema.TXT_AVISO
+        aviso = ("   ·   foto de una version anterior (sin prestamos)"
+                 if getattr(self, "foto_vieja", False) else "")
         self.lbl_estado.config(
             text=f"Datos de {_hace(self.momento_datos)} "
-                 f"({self.momento_datos:%d/%m %H:%M})", fg=color)
+                 f"({self.momento_datos:%d/%m %H:%M}){aviso}", fg=color)
 
     def _refrescar_lista(self) -> None:
         if self.con is None:
@@ -439,15 +455,17 @@ class VisorInventario(tk.Tk):
             estado=estado_map.get(self.filtro_estado.get(), ""),
             ubicacion="" if ubic in ("", "Todas") else ubic)
         for f in filas:
+            prestado = f["tipo"] == "AGRUPADO" and f["prestado"] > 0
             marcas = []
-            if f["estado"] == "FUERA":
+            if f["estado"] == "FUERA" or prestado:
                 marcas.append("fuera")
-            estado = "en bodega" if f["estado"] == "EN_BODEGA" else "fuera"
+            estado = ("parcial" if prestado and f["estado"] == "EN_BODEGA"
+                      else "en bodega" if f["estado"] == "EN_BODEGA" else "fuera")
             self.tabla.insert(
                 "", "end", iid=f["codigo"],
                 values=(f["codigo"], f["nombre"],
-                        "herram." if f["tipo"] == "UNICO" else "material",
-                        f"{fmt(f['existencia'])} {f['unidad']}".strip(),
+                        inventario.TIPO_CORTO.get(f["tipo"], f["tipo"]),
+                        inventario.texto_existencia(f),
                         f["ubicacion"], estado),
                 tags=tuple(marcas))
         valor_total = sum(inventario.valor_articulo(f) for f in filas)
@@ -504,17 +522,25 @@ class VisorInventario(tk.Tk):
 
         pendientes = inventario.pendientes(self.con)
         texto = "\n".join(
-            f"{f['codigo']:<12} {f['nombre'][:26]:<26} {f['quien'][:18]:<18} "
+            f"{f['codigo']:<12} {f['nombre'][:26]:<26} {_quien(f)[:24]:<24} "
             f"{f['dias'] or 0:>3}d  "
-            f"{fmt_dinero(inventario.valor_articulo(f)):>12}"
+            f"{fmt_dinero(f['valor']):>12}"
             for f in pendientes
         ) or "Nada fuera de la bodega."
+        if pendientes:
+            texto += (f"\n\nValor total prestado: "
+                      f"{fmt_dinero(sum(f['valor'] or 0 for f in pendientes))}")
+        if getattr(self, "foto_vieja", False):
+            texto += ("\n\n(Foto de una version anterior del programa: no "
+                      "incluye herramientas con cantidad.)")
         self._llenar_texto(self.texto_pendientes, texto)
 
         bajos = inventario.bajo_stock(self.con)
         texto2 = "\n".join(
             f"{f['codigo']:<12} {f['nombre'][:26]:<26} "
             f"{fmt(f['existencia'])}/{fmt(f['minimo'])} {f['unidad']}"
+            + (f" disp. ({fmt(f['prestado'])} prestadas)"
+               if f["tipo"] == "AGRUPADO" else "")
             for f in bajos
         ) or "Nada por debajo de su minimo."
         self._llenar_texto(self.texto_bajo_stock, texto2)
@@ -525,6 +551,13 @@ class VisorInventario(tk.Tk):
         caja.delete("1.0", "end")
         caja.insert("1.0", contenido)
         caja.config(state="disabled")
+
+
+def _quien(fila) -> str:
+    """Columna 'quien' de Fuera de la bodega: con cantidad para AGRUPADO."""
+    if fila["tipo"] == "AGRUPADO":
+        return f"{fmt(fila['cantidad'])} con {fila['quien']}"
+    return fila["quien"]
 
 
 if __name__ == "__main__":

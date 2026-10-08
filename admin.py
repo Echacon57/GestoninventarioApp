@@ -7,7 +7,9 @@ Administracion del inventario desde la linea de comandos.
     python admin.py lista [texto]          muestra el inventario
     python admin.py pendientes [--dias 3]  lo que esta fuera de la bodega
     python admin.py bajo-stock             consumibles por resurtir
-    python admin.py ajustar MAT-0001 12    corrige una existencia
+    python admin.py ajustar MAT-0001 12    corrige una existencia (en una
+                                           herramienta con cantidad: las
+                                           disponibles en bodega)
     python admin.py exportar [carpeta]     saca todo a CSV
     python admin.py compartir [carpeta]    publica una foto de solo lectura
     python admin.py demo                   carga datos de ejemplo para probar
@@ -31,22 +33,33 @@ def cmd_nuevo(con, args) -> None:
         print("Sin nombre no hay alta.")
         return
 
-    tipo = (input("Tipo  UNICO (herramienta) / CONSUMIBLE (material) [UNICO]: ")
-            .strip().upper() or "UNICO")
+    for clave in inventario.TIPOS:
+        print(f"  {clave:<11} {inventario.NOMBRE_TIPO[clave]}")
+    tipo = (input("Tipo [UNICO]: ").strip().upper() or "UNICO")
+    if tipo not in inventario.TIPOS:
+        print("Tipo no valido: debe ser UNICO, AGRUPADO o CONSUMIBLE.")
+        return
     categoria = input("Categoria []: ").strip()
     ubicacion = input("Ubicacion (estante, rack) []: ").strip()
 
-    if tipo == "CONSUMIBLE":
+    if tipo in ("CONSUMIBLE", "AGRUPADO"):
         unidad = input("Unidad [pza]: ").strip() or "pza"
-        existencia = float(input("Existencia actual [0]: ").strip() or 0)
+        pregunta = ("Piezas disponibles en bodega" if tipo == "AGRUPADO"
+                    else "Existencia actual")
+        existencia = float(input(f"{pregunta} [0]: ").strip() or 0)
         minimo = float(input("Minimo para alertar [0]: ").strip() or 0)
     else:
         unidad, existencia, minimo = "pza", 1, 0
 
-    codigo = inventario.agregar_articulo(
-        con, nombre=nombre, tipo=tipo, categoria=categoria, ubicacion=ubicacion,
-        unidad=unidad, existencia=existencia, minimo=minimo,
-    )
+    try:
+        codigo = inventario.agregar_articulo(
+            con, nombre=nombre, tipo=tipo, categoria=categoria,
+            ubicacion=ubicacion, unidad=unidad, existencia=existencia,
+            minimo=minimo,
+        )
+    except ValueError as err:
+        print(f"No se dio de alta: {err}")
+        return
     print(f"\nListo. Codigo asignado: {codigo}")
     print(f"Imprime su etiqueta con:  python etiquetas.py --codigos {codigo}")
 
@@ -75,8 +88,12 @@ def cmd_lista(con, args) -> None:
           f"{'ESTADO':<10} UBICACION")
     print("-" * 96)
     for f in filas:
+        # En AGRUPADO, EXIST son las disponibles; se agregan las prestadas.
+        extra = (f"  ({fmt(f['prestado'])} prestadas)"
+                 if f["tipo"] == "AGRUPADO" and f["prestado"] else "")
         print(f"{f['codigo']:<11} {f['nombre'][:34]:<34} {f['tipo']:<11} "
-              f"{fmt(f['existencia']):>7}  {f['estado']:<10} {f['ubicacion']}")
+              f"{fmt(f['existencia']):>7}  {f['estado']:<10} {f['ubicacion']}"
+              f"{extra}")
     print(f"\n{len(filas)} articulo(s).")
 
 
@@ -85,11 +102,18 @@ def cmd_pendientes(con, args) -> None:
     if not filas:
         print("No hay nada fuera de la bodega.")
         return
-    print(f"{'CODIGO':<11} {'ARTICULO':<32} {'QUIEN':<22} {'DESDE':<20} DIAS")
-    print("-" * 95)
+    print(f"{'CODIGO':<11} {'ARTICULO':<32} {'QUIEN':<26} {'DESDE':<20} "
+          f"{'DIAS':>4}  VALOR")
+    print("-" * 112)
     for f in filas:
-        print(f"{f['codigo']:<11} {f['nombre'][:32]:<32} {f['quien'][:22]:<22} "
-              f"{str(f['desde'] or ''):<20} {f['dias'] or 0}")
+        # En una herramienta con cantidad cada persona sale en su propia linea.
+        quien = (f"{fmt(f['cantidad'])} con {f['quien']}"
+                 if f["tipo"] == "AGRUPADO" else f["quien"])
+        print(f"{f['codigo']:<11} {f['nombre'][:32]:<32} {quien[:26]:<26} "
+              f"{str(f['desde'] or ''):<20} {f['dias'] or 0:>4}  "
+              f"{inventario.fmt_dinero(f['valor'])}")
+    print(f"\nValor total prestado: "
+          f"{inventario.fmt_dinero(sum(f['valor'] or 0 for f in filas))}")
 
 
 def cmd_bajo_stock(con, args) -> None:
@@ -98,16 +122,17 @@ def cmd_bajo_stock(con, args) -> None:
         print("Ningun consumible esta por debajo de su minimo.")
         return
     for f in filas:
+        texto = ("disponibles" if f["tipo"] == "AGRUPADO" else "quedan")
         print(f"{f['codigo']:<11} {f['nombre'][:34]:<34} "
-              f"quedan {fmt(f['existencia'])} {f['unidad']} "
+              f"{texto} {fmt(f['existencia'])} {f['unidad']} "
               f"(minimo {fmt(f['minimo'])})")
 
 
 def cmd_valor(con, args) -> None:
     total = inventario.valor_inventario(con)
     print(f"Articulos activos:  {total['articulos']}")
-    print(f"En bodega:          {inventario.fmt_dinero(total['en_bodega'])}")
-    print(f"Fuera (prestado):   {inventario.fmt_dinero(total['fuera'])}")
+    print(f"Valor en bodega:    {inventario.fmt_dinero(total['en_bodega'])}")
+    print(f"Prestado:           {inventario.fmt_dinero(total['fuera'])}")
     print(f"Valor total:        {inventario.fmt_dinero(total['total_bodega'])}")
     print()
     print(f"{'CATEGORIA':<28} {'ARTICULOS':>10}   VALOR")

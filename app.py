@@ -204,6 +204,17 @@ class AppInventario(tk.Tk):
         except ValueError:
             cantidad = 1.0
 
+        # Herramienta con cantidad: antes de mover nada se pregunta si se
+        # sacan o se regresan piezas, cuantas y de quien. Sin operador, o si
+        # esta dado de baja, sigue el camino normal para que salga el error.
+        art = inventario.buscar_articulo(self.con, codigo)
+        if (art is not None and art["tipo"] == "AGRUPADO" and art["activo"]
+                and self.persona
+                and inventario.buscar_persona(self.con, codigo) is None):
+            self.cantidad.set("1")
+            self.abrir_agrupado(codigo, self.modo.get(), cantidad=cantidad)
+            return
+
         resultado = inventario.registrar_escaneo(
             self.con, codigo, persona=self.persona,
             modo=self.modo.get(), cantidad=cantidad,
@@ -240,7 +251,10 @@ class AppInventario(tk.Tk):
 
     def _mostrar(self, resultado: inventario.Resultado) -> None:
         color = tema.COLOR_NIVEL.get(resultado.nivel, tema.PANEL)
-        for widget in (self.banner, self.titulo, self.detalle):
+        # El banner es un Frame: solo acepta bg (con fg Tk lanza un error y
+        # el mensaje no se actualizaba).
+        self.banner.config(bg=color)
+        for widget in (self.titulo, self.detalle):
             widget.config(bg=color, fg=tema.color_texto_sobre(color))
         self.titulo.config(text=resultado.titulo)
         self.detalle.config(text=resultado.detalle)
@@ -263,11 +277,30 @@ class AppInventario(tk.Tk):
                 tags=(mov["tipo"],),
             )
 
+    def abrir_agrupado(self, codigo: str, modo: str, cantidad: float = 1,
+                       operador: str | None = None, padre=None, nota: str = "",
+                       al_terminar=None) -> None:
+        """Abre el dialogo Sacar/Regresar de una herramienta con cantidad.
+        Tambien lo usa el registro manual (con su propio operador y padre)."""
+        abierto = getattr(self, "_dialogo_agrupado", None)
+        if abierto is not None and abierto.winfo_exists():
+            abierto.lift()
+            abierto.focus_force()
+            return
+        self._dialogo_agrupado = DialogoAgrupado(
+            self, codigo, modo, cantidad=cantidad,
+            operador=operador or self.persona, padre=padre, nota=nota,
+            al_terminar=al_terminar)
+
     def _refrescar_resumen(self) -> None:
+        # Un AGRUPADO con piezas prestadas cuenta como "fuera" aunque le
+        # queden otras en la bodega.
+        prestado = inventario._sql_prestado(self.con, "articulos")
         fila = self.con.execute(
             "SELECT COUNT(*) AS total,"
             " SUM(estado = 'EN_BODEGA') AS dentro,"
-            " SUM(estado = 'FUERA') AS fuera FROM articulos"
+            " SUM(estado = 'FUERA' OR (tipo = 'AGRUPADO' AND "
+            f"{prestado} > 0)) AS fuera FROM articulos"
         ).fetchone()
         bajos = len(inventario.bajo_stock(self.con))
         self.resumen.config(
@@ -374,13 +407,14 @@ class AppInventario(tk.Tk):
         if not filas:
             texto = "No hay nada fuera de la bodega."
         else:
+            # Un AGRUPADO sale una vez por persona: "2 con Emerson ..."
             lineas = [
-                f"{f['codigo']:<12} {f['nombre'][:30]:<30} {f['quien'][:18]:<18} "
+                f"{f['codigo']:<12} {f['nombre'][:30]:<30} {_quien(f)[:26]:<26} "
                 f"{f['dias'] or 0:>3} dia(s)  "
-                f"{inventario.fmt_dinero(inventario.valor_articulo(f)):>12}"
+                f"{inventario.fmt_dinero(f['valor']):>12}"
                 for f in filas[:40]
             ]
-            total = sum(inventario.valor_articulo(f) for f in filas)
+            total = sum(f["valor"] or 0 for f in filas)
             aviso_recorte = (f"  (mostrando 40 de {len(filas)})"
                              if len(filas) > 40 else "")
             lineas += ["", f"Valor total prestado: "
@@ -395,8 +429,11 @@ class AppInventario(tk.Tk):
         else:
             texto = "\n".join(
                 f"{f['codigo']}  {f['nombre'][:32]:<32} "
-                f"quedan {fmt(f['existencia'])} {f['unidad']} "
-                f"(minimo {fmt(f['minimo'])})"
+                + (f"disponibles {fmt(f['existencia'])} {f['unidad']} "
+                   f"(minimo {fmt(f['minimo'])}, {fmt(f['prestado'])} prestadas)"
+                   if f["tipo"] == "AGRUPADO" else
+                   f"quedan {fmt(f['existencia'])} {f['unidad']} "
+                   f"(minimo {fmt(f['minimo'])})")
                 for f in filas
             )
         self._ventana_texto("bajo_stock", "Material por resurtir", texto)
@@ -432,6 +469,187 @@ class AppInventario(tk.Tk):
         top.bind("<Escape>", lambda e: top.destroy())
         top.caja = caja
         self._ventanas_simples[clave] = top
+
+
+def _quien(fila) -> str:
+    """Columna 'quien' de Pendientes: con cantidad para los AGRUPADO."""
+    if fila["tipo"] == "AGRUPADO":
+        return f"{fmt(fila['cantidad'])} con {fila['quien']}"
+    return fila["quien"]
+
+
+class DialogoAgrupado(tk.Toplevel):
+    """Dialogo pequeno para una herramienta con cantidad (AGRUPADO).
+
+    Muestra cuantas piezas hay en la bodega y quien tiene las demas, y deja
+    elegir Sacar o Regresar y cuantas. Al regresar se elige de quien son las
+    piezas (por omision, del operador si tiene). La regla de negocio sigue
+    en inventario.registrar_escaneo; aqui solo se pregunta.
+    """
+
+    def __init__(self, app: AppInventario, codigo: str, modo: str,
+                 cantidad: float = 1, operador: str | None = None, padre=None,
+                 nota: str = "", al_terminar=None) -> None:
+        super().__init__(padre or app)
+        self.app = app
+        self.codigo = codigo
+        self.operador = operador
+        self.nota = nota
+        self.al_terminar = al_terminar
+        self.padre = padre or app
+        # El gatillo a veces dispara doble: un Enter que llegue antes de
+        # REBOTE_SEG no debe aceptar el dialogo con los valores por omision.
+        self.abierto_en = time.monotonic()
+
+        art = inventario.buscar_articulo(app.con, codigo)
+        prestamos = inventario.prestamos_de(app.con, codigo)
+        self._de = {f"{p['nombre']}  (tiene {fmt(p['cantidad'])})": p["persona"]
+                    for p in prestamos}
+        unidad = art["unidad"] or "pza"
+        disponibles = float(art["existencia"])
+
+        self.title("Herramienta con cantidad")
+        self.configure(bg=tema.PANEL)
+        self.resizable(False, False)
+        self.transient(self.padre)
+
+        tk.Label(self, text=art["nombre"], bg=tema.PANEL, fg=tema.TEXTO,
+                 font=("Segoe UI", 14, "bold"), anchor="w", wraplength=420,
+                 justify="left").pack(fill="x", padx=18, pady=(16, 0))
+        tk.Label(self, text=codigo, bg=tema.PANEL, fg=tema.SUAVE,
+                 font=("Consolas", 10), anchor="w").pack(fill="x", padx=18)
+        tk.Label(self, text=f"Disponibles en bodega: {fmt(disponibles)} {unidad}",
+                 bg=tema.PANEL, fg=tema.TEXTO, font=("Segoe UI", 10),
+                 anchor="w").pack(fill="x", padx=18, pady=(10, 0))
+        quienes = ", ".join(f"{p['nombre']} ({fmt(p['cantidad'])})"
+                            for p in prestamos)
+        tk.Label(self, text=f"Prestadas: {quienes}" if quienes
+                 else "Nadie tiene piezas prestadas.",
+                 bg=tema.PANEL, fg=tema.TXT_SALIDA if quienes else tema.SUAVE,
+                 font=("Segoe UI", 10), anchor="w", wraplength=420,
+                 justify="left").pack(fill="x", padx=18, pady=(2, 10))
+
+        # Accion sugerida: la del modo fijo, o en automatico "Regresar" si el
+        # operador tiene piezas (o si ya no queda ninguna en la bodega).
+        if modo == MODO_SALIDA:
+            sugerida = MODO_SALIDA
+        elif modo == MODO_ENTRADA:
+            sugerida = MODO_ENTRADA
+        else:
+            tiene = any(p["persona"] == operador for p in prestamos)
+            sugerida = (MODO_ENTRADA if prestamos and (tiene or disponibles <= 0)
+                        else MODO_SALIDA)
+        self.accion = tk.StringVar(value=sugerida)
+
+        fila = tk.Frame(self, bg=tema.PANEL)
+        fila.pack(fill="x", padx=18)
+        for valor, texto, permitido in (
+            (MODO_SALIDA, "Sacar", disponibles > 0),
+            (MODO_ENTRADA, "Regresar", bool(prestamos)),
+        ):
+            tk.Radiobutton(fila, text=texto, value=valor, variable=self.accion,
+                           command=self._ajustar, bg=tema.PANEL, fg=tema.TEXTO,
+                           selectcolor=tema.CAMPO, activebackground=tema.PANEL,
+                           activeforeground=tema.TEXTO, font=("Segoe UI", 11),
+                           highlightthickness=0, bd=0,
+                           state="normal" if permitido else "disabled",
+                           ).pack(side="left", padx=(0, 16))
+
+        tk.Label(fila, text="Cantidad", bg=tema.PANEL, fg=tema.SUAVE,
+                 font=("Segoe UI", 9)).pack(side="left", padx=(12, 6))
+        self.cantidad = tk.StringVar(value=fmt(cantidad if cantidad > 0 else 1))
+        tk.Spinbox(fila, from_=1, to=9999, increment=1, width=6,
+                   textvariable=self.cantidad, font=("Segoe UI", 13),
+                   justify="center", bg=tema.CAMPO, fg=tema.TEXTO, relief="flat",
+                   buttonbackground=tema.PANEL).pack(side="left")
+
+        self.fila_de = tk.Frame(self, bg=tema.PANEL)
+        tk.Label(self.fila_de, text="De quien son", bg=tema.PANEL, fg=tema.SUAVE,
+                 font=("Segoe UI", 9)).pack(side="left", padx=(0, 6))
+        self.de = tk.StringVar()
+        ttk.Combobox(self.fila_de, textvariable=self.de, state="readonly",
+                     values=list(self._de), width=34,
+                     font=("Segoe UI", 10)).pack(side="left")
+        for texto, persona in self._de.items():
+            if persona == operador:
+                self.de.set(texto)
+                break
+        else:
+            if self._de:
+                self.de.set(next(iter(self._de)))
+
+        self.aviso = tk.Label(self, text="", bg=tema.PANEL, fg=tema.TXT_ERROR,
+                              font=("Segoe UI", 9), anchor="w", wraplength=420,
+                              justify="left")
+        self.aviso.pack(fill="x", padx=18, pady=(8, 0))
+
+        botones = tk.Frame(self, bg=tema.PANEL)
+        botones.pack(fill="x", padx=18, pady=(8, 16))
+        tema.boton(botones, "Aceptar (Enter)", self.aceptar, tema.VERDE
+                   ).pack(side="left")
+        tema.boton(botones, "Cancelar (Esc)", lambda: self.cerrar(None)
+                   ).pack(side="left", padx=6)
+
+        self._ajustar()
+        self.bind("<Return>", self._al_enter)
+        self.bind("<KP_Enter>", self._al_enter)
+        self.bind("<Escape>", lambda e: self.cerrar(None))
+        self.protocol("WM_DELETE_WINDOW", lambda: self.cerrar(None))
+        # El foco va al dialogo, no a la cantidad: si el lector dispara de
+        # nuevo, sus teclas no se escriben en ningun campo.
+        self.update_idletasks()
+        try:
+            self.grab_set()
+        except tk.TclError:
+            pass  # la ventana aun no se ve; sin grab funciona igual
+        self.focus_force()
+
+    def _ajustar(self) -> None:
+        """La lista 'De quien son' solo aplica al regresar."""
+        if self.accion.get() == MODO_ENTRADA:
+            self.fila_de.pack(fill="x", padx=18, pady=(10, 0), before=self.aviso)
+        else:
+            self.fila_de.pack_forget()
+
+    def _al_enter(self, _evento=None) -> None:
+        if time.monotonic() - self.abierto_en < REBOTE_SEG:
+            return  # Enter del mismo disparo del lector, se ignora
+        self.aceptar()
+
+    def aceptar(self) -> None:
+        try:
+            cantidad = float(str(self.cantidad.get()).replace(",", "."))
+        except ValueError:
+            self.aviso.config(text="Escribe una cantidad numerica.")
+            self.bell()
+            return
+        accion = self.accion.get()
+        de = self._de.get(self.de.get()) if accion == MODO_ENTRADA else None
+        resultado = inventario.registrar_escaneo(
+            self.app.con, self.codigo, persona=self.operador, modo=accion,
+            cantidad=cantidad, nota=self.nota, de_persona=de)
+        if not resultado.ok:
+            # No cambio nada: se deja el dialogo abierto para corregir.
+            self.aviso.config(text=f"{resultado.titulo}. {resultado.detalle}")
+            self.bell()
+            return
+        self.cerrar(resultado)
+
+    def cerrar(self, resultado: inventario.Resultado | None) -> None:
+        self.grab_release()
+        self.destroy()
+        # Una lectura repetida justo al cerrar tampoco debe reabrirlo.
+        self.app.ultimo = (self.codigo, time.monotonic())
+        if resultado is not None:
+            self.app.tras_movimiento(resultado)
+        elif self.padre is self.app:
+            self.app._mostrar(inventario.Resultado(
+                True, "aviso", "Sin cambios", f"Se cancelo el movimiento de "
+                                              f"{self.codigo}."))
+        if self.al_terminar:
+            self.al_terminar(resultado)
+        destino = self.app.entrada if self.padre is self.app else self.padre
+        self.padre.after(50, destino.focus_set)
 
 
 if __name__ == "__main__":
