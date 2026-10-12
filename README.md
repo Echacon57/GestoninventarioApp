@@ -22,6 +22,57 @@ Eso instala `python-barcode` y `Pillow` para las etiquetas, y `pandas` +
 `openpyxl` para los reportes en Excel y para convertir un inventario existente
 (ver sección 8). El resto usa la librería estándar.
 
+### Instalación en Mac
+
+El programa funciona igual en macOS. Se abre con doble clic en
+**`escaneo.command`** (ventana de escaneo) o **`visor.command`** (solo
+lectura). La primera vez preparan solos un entorno de Python (`.venv`) con lo
+necesario ("Primera vez: preparando el entorno…"); después abren directo.
+
+1. **Python 3.12 o más reciente desde
+   [python.org](https://www.python.org/downloads/macos/)**: trae Tk 8.6, que
+   necesitan las ventanas. *No* sirve el Python que viene con Xcode / Command
+   Line Tools (trae un Tk viejo y falla). Si usas Homebrew, instala además
+   `brew install python-tk`. Si el `.command` no encuentra un Python adecuado,
+   te lo dice y espera una tecla antes de cerrar.
+2. **Copia la carpeta del proyecto a un lugar local**, por ejemplo
+   *Documentos*. **No** la ejecutes dentro de una carpeta sincronizada de
+   OneDrive (ver sección 12): ahí solo va la carpeta compartida del visor.
+3. **Primer uso (Gatekeeper):** macOS bloquea los archivos descargados. Haz
+   clic derecho sobre el `.command` → **Abrir** → *Abrir*, o en la Terminal,
+   dentro de la carpeta:
+   ```bash
+   xattr -d com.apple.quarantine escaneo.command visor.command
+   ```
+   Si dice que no tiene permiso para ejecutarse (pasa si la carpeta llegó en
+   un .zip), dale permiso una vez:
+   ```bash
+   chmod +x escaneo.command visor.command
+   ```
+4. Si macOS pregunta si la **Terminal** puede acceder a *Documentos* o al
+   *Escritorio*, acepta: ahí vive la base de datos.
+5. **OneDrive en Mac** vive en `~/Library/CloudStorage/OneDrive-…` (carpeta
+   oculta). Para elegirla en "Compartir (solo lectura)" o en el visor, en el
+   selector de carpetas presiona **Cmd+Shift+G** y pega esa ruta.
+
+Diferencias en Mac:
+
+- **Atajos:** en una MacBook F1–F4 son teclas del sistema (brillo, Mission
+  Control…), así que se usan **⌘1** (automático), **⌘2** (solo salidas),
+  **⌘3** (solo entradas) y **⌘4** (registro manual). Los rótulos de la
+  ventana ya muestran los de Mac. `Esc` y `Enter` funcionan igual.
+- Los botones de opción, casillas y el selector de cantidad son los nativos
+  de macOS: pueden verse un poco distintos (forma o color) que en Windows. El
+  resto de la ventana (colores, botones, tablas) se ve igual.
+- **Lector Steren COM-595:** configúralo con sufijo *Enter*, igual que en
+  Windows (sección 2). Si la distribución del teclado de la Mac es distinta a
+  la del lector, un guion puede llegar como apóstrofo (`HER'0001`); el
+  programa ya lo convierte a guion solo.
+- Al abrir desde el `.command`, la ventana de escaneo se pone al frente y
+  toma el foco, para que el lector no escriba en la Terminal. Si alguna vez
+  la Terminal queda adelante, haz clic en la ventana de escaneo antes de
+  escanear.
+
 ## 2. Configurar el lector (una sola vez)
 
 El COM-595 se comporta como un teclado: no necesita drivers. Antes de usarlo:
@@ -63,6 +114,7 @@ elimina el archivo `datos/inventario.db`.
 | `db.py` | Crea la base, define las tablas y hace el respaldo automático |
 | `tema.py` | Colores y estilo compartido entre las ventanas |
 | `admin.py` | Lo mismo desde la línea de comandos, por si lo prefieres |
+| `escaneo.command` / `visor.command` | Lanzadores de doble clic para macOS (ver "Instalación en Mac") |
 
 ---
 
@@ -158,15 +210,16 @@ cantidad abren su propio diálogo (Sacar / Regresar, cantidad y de quién);
 
 ### Modos
 
-| Tecla | Modo | Qué hace |
-|---|---|---|
-| `F1` | Automático | Herramienta: alterna. Consumible: descuenta |
-| `F2` | Solo salidas | Todo se registra como salida (útil al surtir una orden grande) |
-| `F3` | Solo entradas | Todo se registra como entrada (devoluciones o material que llega) |
+| Tecla (Windows) | Mac | Modo | Qué hace |
+|---|---|---|---|
+| `F1` | `⌘1` | Automático | Herramienta: alterna. Consumible: descuenta |
+| `F2` | `⌘2` | Solo salidas | Todo se registra como salida (útil al surtir una orden grande) |
+| `F3` | `⌘3` | Solo entradas | Todo se registra como entrada (devoluciones o material que llega) |
 
 ### Sin lector: registro manual
 
-Si el escáner no está disponible, el botón **"Registro manual (F4)"** abre una
+Si el escáner no está disponible, el botón **"Registro manual (F4)"** (en Mac
+**"Registro manual (⌘4)"**) abre una
 ventana con la lista de artículos y un buscador. Se elige el operador, se
 selecciona el artículo, se pone la cantidad (solo para material) y se presiona
 **Registrar SALIDA** o **Registrar ENTRADA**. Se aplican las mismas reglas que
@@ -363,7 +416,8 @@ python admin.py compartir   # vuelve a publicar en la carpeta ya configurada
 
 1. Python instalado (con Tkinter; en Windows/Mac ya viene incluido).
 2. Copiar estos 5 archivos: `visor.py`, `inventario.py`, `snapshot.py`,
-   `db.py`, `tema.py`.
+   `db.py`, `tema.py`. En Mac copia además `visor.command` y
+   `requirements_visor.txt`, y abre con doble clic en `visor.command`.
 3. Tener sincronizada la **misma carpeta** que configuraste en el paso
    anterior (por ejemplo, iniciar sesión con la misma cuenta de OneDrive, o
    una carpeta compartida contigo).

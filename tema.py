@@ -10,15 +10,54 @@ Los demas modulos leen los colores como tema.FONDO, tema.PANEL, etc. (no con
 Cambiar de tema no repinta widget por widget: guarda la preferencia, cierra
 la ventana y la vuelve a construir con la paleta nueva (ver cambiar_tema y
 ejecutar). Es mas simple y fiable, y tarda un instante.
+
+Tambien concentra lo que cambia entre Windows y macOS (fuentes, rueda del
+mouse, botones de color, traer la ventana al frente). Todo va protegido con
+ES_MAC / sys.platform: en Windows el resultado es el mismo de siempre.
 """
 
 from __future__ import annotations
 
+import sys
 import tkinter as tk
 from pathlib import Path
 from tkinter import ttk
 
-RUTA_PREFERENCIA = Path(__file__).resolve().parent / "datos" / "tema.txt"
+RAIZ = Path(__file__).resolve().parent
+RUTA_PREFERENCIA = RAIZ / "datos" / "tema.txt"
+RUTA_ICONO = RAIZ / "Inventario.ico"
+
+# ------------------------------------------------------------ plataforma
+ES_MAC = sys.platform == "darwin"
+ES_WINDOWS = sys.platform.startswith("win")
+ES_LINUX = sys.platform.startswith("linux")
+
+
+def config_fuentes(plataforma: str = sys.platform) -> tuple[str, str, float]:
+    """(fuente de interfaz, fuente monoespaciada, escala) para la plataforma.
+
+    "Segoe UI" y "Consolas" no existen en Mac (Tk usaria otra sin avisar), y
+    Tk en Mac trabaja a 72 dpi, asi que los mismos puntos se ven ~0.75x mas
+    chicos que en Windows: por eso la escala. Ajustala aqui si hace falta.
+    """
+    if plataforma == "darwin":
+        return "Helvetica Neue", "Menlo", 1.3
+    if plataforma.startswith("win"):
+        return "Segoe UI", "Consolas", 1.0
+    return "DejaVu Sans", "DejaVu Sans Mono", 1.0
+
+
+FUENTE_UI, FUENTE_MONO, ESCALA_FUENTE = config_fuentes()
+
+
+def fuente(tam: int, *estilo: str) -> tuple:
+    """Fuente de interfaz: tema.fuente(10) o tema.fuente(9, "bold")."""
+    return (FUENTE_UI, round(tam * ESCALA_FUENTE), *estilo)
+
+
+def fuente_mono(tam: int, *estilo: str) -> tuple:
+    """Fuente monoespaciada (codigos, reportes en texto)."""
+    return (FUENTE_MONO, round(tam * ESCALA_FUENTE), *estilo)
 
 # Todos los pares texto/fondo de ambas paletas cumplen WCAG AA (contraste
 # >= 4.5:1).
@@ -158,12 +197,54 @@ def ejecutar(crear) -> None:
         if reapertura:
             ventana.geometry(reapertura["geometria"])
             if reapertura["maximizada"]:
-                ventana.state("zoomed")
+                try:
+                    ventana.state("zoomed")
+                except tk.TclError:
+                    pass  # en Linux no existe "zoomed"
+            traer_al_frente(ventana)
         ventana.mainloop()
         reapertura = getattr(ventana, "reapertura", None)
         if reapertura is None:
             break
         estado = reapertura["estado"]
+
+
+def traer_al_frente(ventana: tk.Misc) -> None:
+    """En Mac, al abrir desde Terminal la ventana puede quedar detras o sin
+    foco, y el lector (que escribe como teclado) mandaria los codigos a la
+    Terminal. Aqui se sube al frente y se toma el foco. En Windows no hace
+    nada."""
+    if not ES_MAC:
+        return
+    ventana.update_idletasks()
+    ventana.lift()
+    ventana.attributes("-topmost", True)
+    ventana.after(300, lambda: ventana.attributes("-topmost", False))
+    ventana.focus_force()
+
+
+def poner_icono(ventana: tk.Misc) -> None:
+    """Icono .ico de la ventana. Solo Windows: en Mac/Linux iconbitmap no
+    acepta .ico y lanzaria un error."""
+    if not ES_WINDOWS:
+        return
+    try:
+        ventana.iconbitmap(str(RUTA_ICONO))
+    except tk.TclError:
+        pass  # sin icono, pero la ventana abre igual
+
+
+def pasos_rueda(delta: int, plataforma: str = sys.platform) -> int:
+    """Unidades para yview_scroll segun el delta de <MouseWheel>.
+
+    En Windows delta viene en multiplos de 120; en Mac en valores chicos
+    (+-1, +-2...). Positivo = rueda hacia arriba = desplazar hacia arriba.
+    """
+    if not delta:
+        return 0
+    if plataforma == "darwin":
+        return -int(delta)
+    return -(int(delta / 120) or (1 if delta > 0 else -1))
 
 
 # ------------------------------------------------------------------ widgets
@@ -201,14 +282,115 @@ def aplicar_estilo(ventana: tk.Misc) -> ttk.Style:
     return estilo
 
 
+class BotonColor(tk.Label):
+    """Boton de color hecho con un Label, para macOS.
+
+    En Mac tk.Button es el boton nativo (Aqua): ignora bg, relief y
+    activebackground, y todos los botones de color saldrian blancos. Este
+    se comporta como el tk.Button que usa tema.boton(): command al soltar el
+    clic dentro, invoke(), config(text=..., bg=...), estado "disabled" y
+    color de presionado (activebackground / activeforeground).
+    """
+
+    def __init__(self, padre, command=None, activebackground=None,
+                 activeforeground=None, state="normal", **kwargs) -> None:
+        manita = kwargs.get("cursor") in (None, "hand2")
+        if manita:
+            kwargs["cursor"] = "hand2"
+        kwargs.setdefault("disabledforeground", SUAVE)
+        super().__init__(padre, state=state, **kwargs)
+        if manita and ES_MAC:
+            try:
+                super().configure(cursor="pointinghand")  # manita nativa de Mac
+            except tk.TclError:
+                pass  # este Tk no la conoce: se queda hand2
+        self._comando = command
+        self._bg_normal = super().cget("bg")
+        self._fg_normal = super().cget("fg")
+        self._bg_activo = activebackground or AZUL
+        self._fg_activo = activeforeground or SOBRE_COLOR
+        self._presionado = False
+        self.bind("<ButtonPress-1>", self._al_presionar)
+        self.bind("<ButtonRelease-1>", self._al_soltar)
+        self.bind("<Leave>", lambda e: self._pintar(False))
+        self.bind("<Enter>", lambda e: self._pintar(self._presionado))
+
+    def _habilitado(self) -> bool:
+        return str(super().cget("state")) != "disabled"
+
+    def _pintar(self, activo: bool) -> None:
+        if activo and self._habilitado():
+            super().configure(bg=self._bg_activo, fg=self._fg_activo)
+        else:
+            super().configure(bg=self._bg_normal, fg=self._fg_normal)
+
+    def _al_presionar(self, _evento=None) -> None:
+        if not self._habilitado():
+            return
+        self._presionado = True
+        self._pintar(True)
+
+    def _al_soltar(self, evento) -> None:
+        if not self._presionado:
+            return
+        self._presionado = False
+        self._pintar(False)
+        dentro = (0 <= evento.x < self.winfo_width()
+                  and 0 <= evento.y < self.winfo_height())
+        if dentro:
+            self.invoke()
+
+    def invoke(self):
+        """Ejecuta el comando, como tk.Button.invoke()."""
+        if self._comando is None or not self._habilitado():
+            return None
+        return self._comando()
+
+    def configure(self, cnf=None, **kwargs):
+        if cnf:
+            kwargs = {**cnf, **kwargs}
+        if "command" in kwargs:
+            self._comando = kwargs.pop("command")
+        if "activebackground" in kwargs:
+            self._bg_activo = kwargs.pop("activebackground")
+        if "activeforeground" in kwargs:
+            self._fg_activo = kwargs.pop("activeforeground")
+        # El color nuevo pasa a ser el normal (p. ej. "Dar de baja" en rojo
+        # cambia a "Reactivar" en verde).
+        for clave in ("bg", "background"):
+            if clave in kwargs:
+                self._bg_normal = kwargs[clave]
+        for clave in ("fg", "foreground"):
+            if clave in kwargs:
+                self._fg_normal = kwargs[clave]
+        if not kwargs:
+            return super().configure()
+        return super().configure(**kwargs)
+
+    config = configure
+
+    def cget(self, clave):
+        if clave == "command":
+            return self._comando
+        if clave == "activebackground":
+            return self._bg_activo
+        if clave == "activeforeground":
+            return self._fg_activo
+        return super().cget(clave)
+
+    __getitem__ = cget
+
+
 def boton(padre, texto: str, comando, color: str | None = None,
           **kwargs) -> tk.Button:
     color = color or PANEL
     opciones = dict(bg=color, fg=color_texto_sobre(color), relief="flat",
-                    font=("Segoe UI", 10), padx=14, pady=6,
+                    font=fuente(10), padx=14, pady=6,
                     activebackground=AZUL, activeforeground=SOBRE_COLOR,
                     takefocus=False, cursor="hand2")
     opciones.update(kwargs)
+    if ES_MAC:
+        return BotonColor(padre, text=texto, command=comando, **opciones)
     return tk.Button(padre, text=texto, command=comando, **opciones)
 
 
@@ -224,12 +406,12 @@ def boton_tema(padre, ventana: tk.Tk, obtener_estado=None,
 
 def titulo(padre, texto: str, **kwargs) -> tk.Label:
     return tk.Label(padre, text=texto, bg=kwargs.pop("bg", FONDO), fg=SUAVE,
-                    font=("Segoe UI", 9, "bold"), anchor="w", **kwargs)
+                    font=fuente(9, "bold"), anchor="w", **kwargs)
 
 
 def entrada(padre, **kwargs) -> tk.Entry:
     return tk.Entry(padre, bg=CAMPO, fg=TEXTO, insertbackground=TEXTO,
-                    relief="flat", font=("Segoe UI", 11), **kwargs)
+                    relief="flat", font=fuente(11), **kwargs)
 
 
 def marco_desplazable(padre, bg: str | None = None) -> tuple[tk.Widget, tk.Frame]:
@@ -255,10 +437,24 @@ def marco_desplazable(padre, bg: str | None = None) -> tuple[tk.Widget, tk.Frame
     lienzo.bind("<Configure>", _al_cambiar_tamano)
 
     def _rueda(evento) -> None:
-        lienzo.yview_scroll(-1 * (evento.delta // 120 or 1), "units")
+        pasos = pasos_rueda(evento.delta)
+        if pasos:
+            lienzo.yview_scroll(pasos, "units")
+
+    def _vincular(_evento=None) -> None:
+        lienzo.bind_all("<MouseWheel>", _rueda)
+        if ES_LINUX:  # en Linux la rueda llega como botones 4 y 5
+            lienzo.bind_all("<Button-4>", lambda e: lienzo.yview_scroll(-1, "units"))
+            lienzo.bind_all("<Button-5>", lambda e: lienzo.yview_scroll(1, "units"))
+
+    def _desvincular(_evento=None) -> None:
+        lienzo.unbind_all("<MouseWheel>")
+        if ES_LINUX:
+            lienzo.unbind_all("<Button-4>")
+            lienzo.unbind_all("<Button-5>")
 
     for widget in (lienzo, interno):
-        widget.bind("<Enter>", lambda e: lienzo.bind_all("<MouseWheel>", _rueda))
-        widget.bind("<Leave>", lambda e: lienzo.unbind_all("<MouseWheel>"))
+        widget.bind("<Enter>", _vincular)
+        widget.bind("<Leave>", _desvincular)
 
     return contenedor, interno

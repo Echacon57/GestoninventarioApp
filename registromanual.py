@@ -39,7 +39,7 @@ class VentanaManual(tk.Toplevel):
         self._personas: dict[str, str] = {}   # texto del combo -> codigo
 
         self.title("Registro manual de entradas y salidas")
-        self.iconbitmap("Inventario.ico")
+        tema.poner_icono(self)
         self.configure(bg=tema.FONDO)
         self.geometry("920x600")
         self.minsize(740, 480)
@@ -59,7 +59,7 @@ class VentanaManual(tk.Toplevel):
         tema.titulo(arriba, "OPERADOR").pack(side="left", padx=(0, 8))
         self.operador = tk.StringVar()
         combo = ttk.Combobox(arriba, textvariable=self.operador, state="readonly",
-                             width=30, font=("Segoe UI", 10))
+                             width=30, font=tema.fuente(10))
         combo.pack(side="left")
         combo.bind("<<ComboboxSelected>>", self._al_elegir_operador)
         self.combo_operador = combo
@@ -99,30 +99,30 @@ class VentanaManual(tk.Toplevel):
 
         self.lbl_seleccion = tk.Label(abajo, text="Selecciona un articulo de la lista",
                                       bg=tema.PANEL, fg=tema.SUAVE, anchor="w",
-                                      font=("Segoe UI", 11, "bold"))
+                                      font=tema.fuente(11, "bold"))
         self.lbl_seleccion.pack(side="left", fill="x", expand=True,
                                 padx=14, pady=12)
 
         tema.boton(abajo, "Registrar ENTRADA", lambda: self._registrar(MODO_ENTRADA),
-                   color=tema.VERDE, font=("Segoe UI", 10, "bold")
+                   color=tema.VERDE, font=tema.fuente(10, "bold")
                    ).pack(side="right", padx=(4, 14), pady=10)
         tema.boton(abajo, "Registrar SALIDA", lambda: self._registrar(MODO_SALIDA),
-                   color=tema.AMBAR, font=("Segoe UI", 10, "bold")
+                   color=tema.AMBAR, font=tema.fuente(10, "bold")
                    ).pack(side="right", padx=4, pady=10)
 
         self.cantidad = tk.StringVar(value="1")
         self.spin_cantidad = tk.Spinbox(
             abajo, from_=0.5, to=9999, increment=1, width=6,
-            textvariable=self.cantidad, font=("Segoe UI", 14), justify="center",
+            textvariable=self.cantidad, font=tema.fuente(14), justify="center",
             bg=tema.CAMPO, fg=tema.TEXTO, relief="flat", buttonbackground=tema.PANEL,
             disabledbackground=tema.PANEL, disabledforeground=tema.SUAVE)
         self.spin_cantidad.pack(side="right", padx=(4, 12))
         tk.Label(abajo, text="Cantidad", bg=tema.PANEL, fg=tema.SUAVE,
-                 font=("Segoe UI", 9)).pack(side="right")
+                 font=tema.fuente(9)).pack(side="right")
 
         # --- resultado del ultimo registro
         self.resultado = tk.Label(self, text="", bg=tema.FONDO, fg=tema.TEXTO, anchor="w",
-                                  font=("Segoe UI", 11, "bold"), padx=14, pady=8)
+                                  font=tema.fuente(11, "bold"), padx=14, pady=8)
         self.resultado.pack(fill="x", padx=16, pady=(0, 14))
 
     # ------------------------------------------------------------ datos

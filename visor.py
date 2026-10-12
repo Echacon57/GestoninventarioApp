@@ -28,6 +28,11 @@ from inventario import fmt, fmt_dinero
 # Cada cuanto se refresca solo, ademas del boton manual. En segundos.
 INTERVALO_REFRESCO_SEG = 60
 
+# En Mac las fuentes salen mas grandes: un poco mas de ventana y de panel de
+# detalle para que no se corten. En Windows, las medidas de siempre.
+TAMANO_VISOR = "1180x760" if tema.ES_MAC else "1040x680"
+ANCHO_DETALLE = 380 if tema.ES_MAC else 320
+
 
 def _hace(momento: datetime) -> str:
     """'hace 3 minutos', 'hace 2 horas'... para no mostrar timestamps secos."""
@@ -51,8 +56,8 @@ class VisorInventario(tk.Tk):
             snapshot.RUTA_CONFIG_VISOR)
 
         self.title("Inventario de bodega - solo lectura")
-        self.iconbitmap("Inventario.ico")
-        self.geometry("1040x680")
+        tema.poner_icono(self)
+        self.geometry(TAMANO_VISOR)
         self.minsize(880, 560)
         self.configure(bg=tema.FONDO)
         tema.aplicar_estilo(self)
@@ -64,6 +69,7 @@ class VisorInventario(tk.Tk):
         else:
             self.after(300, self.actualizar)
         self.after(INTERVALO_REFRESCO_SEG * 1000, self._refresco_automatico)
+        tema.traer_al_frente(self)
 
     # ---------------------------------------------------------------- Interfaz de Usuario
     def _construir(self) -> None:
@@ -73,11 +79,11 @@ class VisorInventario(tk.Tk):
         interior.pack(fill="x", padx=16, pady=10)
 
         tk.Label(interior, text="Inventario de bodega — solo lectura",
-                 bg=tema.PANEL, fg=tema.TEXTO, font=("Segoe UI", 13, "bold")
+                 bg=tema.PANEL, fg=tema.TEXTO, font=tema.fuente(13, "bold")
                  ).pack(side="left")
 
         self.lbl_estado = tk.Label(interior, text="", bg=tema.PANEL, fg=tema.SUAVE,
-                                   font=("Segoe UI", 10))
+                                   font=tema.fuente(10))
         self.lbl_estado.pack(side="right", padx=(0, 12))
         tema.boton(interior, "Actualizar ahora", self.actualizar
                   ).pack(side="right", padx=4)
@@ -101,7 +107,7 @@ class VisorInventario(tk.Tk):
     def _construir_inventario(self, cuaderno) -> tk.Frame:
         marco = tk.Frame(cuaderno, bg=tema.FONDO)
         marco.columnconfigure(0, weight=3)
-        marco.columnconfigure(1, weight=2, minsize=320)
+        marco.columnconfigure(1, weight=2, minsize=ANCHO_DETALLE)
         marco.rowconfigure(2, weight=1)
 
         barra = tk.Frame(marco, bg=tema.FONDO)
@@ -117,9 +123,9 @@ class VisorInventario(tk.Tk):
                           pady=(0, 6))
 
         tk.Label(fila_filtros, text="Estado:", bg=tema.FONDO, fg=tema.SUAVE,
-                 font=("Segoe UI", 9)).pack(side="left", padx=(0, 4))
+                 font=tema.fuente(9)).pack(side="left", padx=(0, 4))
         self.filtro_estado = ttk.Combobox(
-            fila_filtros, state="readonly", width=16, font=("Segoe UI", 9),
+            fila_filtros, state="readonly", width=16, font=tema.fuente(9),
             values=["Todos", "En bodega", "Fuera de la bodega"])
         self.filtro_estado.current(0)
         self.filtro_estado.pack(side="left")
@@ -127,9 +133,9 @@ class VisorInventario(tk.Tk):
                                 lambda e: self._refrescar_lista())
 
         tk.Label(fila_filtros, text="Ubicacion:", bg=tema.FONDO, fg=tema.SUAVE,
-                 font=("Segoe UI", 9)).pack(side="left", padx=(12, 4))
+                 font=tema.fuente(9)).pack(side="left", padx=(12, 4))
         self.filtro_ubicacion = ttk.Combobox(
-            fila_filtros, state="readonly", width=16, font=("Segoe UI", 9),
+            fila_filtros, state="readonly", width=16, font=tema.fuente(9),
             values=["Todas"])
         self.filtro_ubicacion.current(0)
         self.filtro_ubicacion.pack(side="left")
@@ -164,7 +170,7 @@ class VisorInventario(tk.Tk):
         self.tabla.tag_configure("fuera", foreground=tema.TXT_SALIDA)
 
         self.conteo = tk.Label(izq, text="", bg=tema.FONDO, fg=tema.SUAVE,
-                               font=("Segoe UI", 9))
+                               font=tema.fuente(9))
         self.conteo.grid(row=1, column=0, sticky="w", pady=(6, 0))
 
         self.detalle = tk.Frame(marco, bg=tema.PANEL)
@@ -218,7 +224,7 @@ class VisorInventario(tk.Tk):
         self.tabla_movs.tag_configure("AJUSTE", foreground=tema.SUAVE)
 
         self.conteo_movs = tk.Label(marco, text="", bg=tema.FONDO, fg=tema.SUAVE,
-                                    font=("Segoe UI", 9))
+                                    font=tema.fuente(9))
         self.conteo_movs.grid(row=2, column=0, sticky="w", padx=14,
                               pady=(0, 14))
 
@@ -230,7 +236,7 @@ class VisorInventario(tk.Tk):
         resumen = tk.Frame(marco, bg=tema.PANEL)
         resumen.pack(fill="x", padx=14, pady=14)
         self.lbl_valor = tk.Label(resumen, text="", bg=tema.PANEL, fg=tema.TEXTO,
-                                  font=("Segoe UI", 13, "bold"), anchor="w",
+                                  font=tema.fuente(13, "bold"), anchor="w",
                                   justify="left")
         self.lbl_valor.pack(fill="x", padx=16, pady=12)
 
@@ -259,7 +265,7 @@ class VisorInventario(tk.Tk):
         cont.pack(fill="both", expand=True, padx=12, pady=(0, 12))
         cont.rowconfigure(0, weight=1)
         cont.columnconfigure(0, weight=1)
-        caja = tk.Text(cont, bg=tema.CAMPO, fg=tema.TEXTO, font=("Consolas", 9),
+        caja = tk.Text(cont, bg=tema.CAMPO, fg=tema.TEXTO, font=tema.fuente_mono(9),
                        relief="flat", wrap="none", height=10)
         caja.grid(row=0, column=0, sticky="nsew")
         # Barras por si las lineas no caben en media ventana.
@@ -277,20 +283,20 @@ class VisorInventario(tk.Tk):
 
         if art is None:
             tk.Label(self.detalle, text="Selecciona un articulo de la lista",
-                     bg=tema.PANEL, fg=tema.SUAVE, font=("Segoe UI", 10),
+                     bg=tema.PANEL, fg=tema.SUAVE, font=tema.fuente(10),
                      wraplength=260).pack(padx=16, pady=16)
             return
 
         tk.Label(self.detalle, text=art["nombre"], bg=tema.PANEL, fg=tema.TEXTO,
-                 font=("Segoe UI", 14, "bold"), anchor="w", wraplength=300,
+                 font=tema.fuente(14, "bold"), anchor="w", wraplength=300,
                  justify="left").pack(fill="x", padx=16, pady=(16, 2))
         tk.Label(self.detalle, text=art["codigo"], bg=tema.PANEL, fg=tema.SUAVE,
-                 font=("Consolas", 11), anchor="w").pack(fill="x", padx=16,
+                 font=tema.fuente_mono(11), anchor="w").pack(fill="x", padx=16,
                                                          pady=(0, 10))
 
         if not art["activo"]:
             tk.Label(self.detalle, text="DADO DE BAJA", bg=tema.PANEL, fg=tema.TXT_ERROR,
-                     font=("Segoe UI", 9, "bold"), anchor="w").pack(
+                     font=tema.fuente(9, "bold"), anchor="w").pack(
                 fill="x", padx=16, pady=(0, 8))
 
         if art["tipo"] == "AGRUPADO":
@@ -319,18 +325,18 @@ class VisorInventario(tk.Tk):
             fila = tk.Frame(self.detalle, bg=tema.PANEL)
             fila.pack(fill="x", padx=16, pady=2)
             tk.Label(fila, text=etiqueta, bg=tema.PANEL, fg=tema.SUAVE,
-                     font=("Segoe UI", 9), width=14, anchor="w").pack(
+                     font=tema.fuente(9), width=14, anchor="w").pack(
                 side="left")
             tk.Label(fila, text=valor, bg=tema.PANEL, fg=tema.TEXTO,
-                     font=("Segoe UI", 9), anchor="w", wraplength=170,
+                     font=tema.fuente(9), anchor="w", wraplength=170,
                      justify="left").pack(side="left", fill="x", expand=True)
 
         if art["notas"]:
             tk.Label(self.detalle, text="Notas", bg=tema.PANEL, fg=tema.SUAVE,
-                     font=("Segoe UI", 9, "bold"), anchor="w").pack(
+                     font=tema.fuente(9, "bold"), anchor="w").pack(
                 fill="x", padx=16, pady=(10, 0))
             tk.Label(self.detalle, text=art["notas"], bg=tema.PANEL, fg=tema.TEXTO,
-                     font=("Segoe UI", 9), anchor="w", wraplength=280,
+                     font=tema.fuente(9), anchor="w", wraplength=280,
                      justify="left").pack(fill="x", padx=16, pady=(0, 12))
 
     # ------------------------------------------------------------ datos

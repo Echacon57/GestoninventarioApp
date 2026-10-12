@@ -1,0 +1,4 @@
+# Los lanzadores de macOS se rompen con fin de linea CRLF (Windows):
+# siempre LF.
+*.command text eol=lf
+*.sh text eol=lf
