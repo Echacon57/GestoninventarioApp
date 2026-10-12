@@ -39,6 +39,7 @@ class VentanaManual(tk.Toplevel):
         self._personas: dict[str, str] = {}   # texto del combo -> codigo
 
         self.title("Registro manual de entradas y salidas")
+        self.iconbitmap("Inventario.ico")
         self.configure(bg=tema.FONDO)
         self.geometry("920x600")
         self.minsize(740, 480)

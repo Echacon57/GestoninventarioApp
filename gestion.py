@@ -804,6 +804,7 @@ class PanelGestion(tk.Toplevel):
         self.al_cerrar = al_cerrar
 
         self.title("Catalogo - herramienta, material y personal")
+        self.iconbitmap("Inventario.ico")
         self.geometry("1120x700")
         self.minsize(960, 620)
         self.configure(bg=tema.FONDO)

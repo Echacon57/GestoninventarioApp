@@ -45,6 +45,7 @@ class AppInventario(tk.Tk):
         self._ventanas_simples = {}       # clave -> Toplevel, para no duplicar
 
         self.title("Inventario de bodega - escaneo")
+        self.iconbitmap("Inventario.ico")
         self.geometry("1100x680")
         self.minsize(1100, 600)
         self.configure(bg=tema.FONDO)

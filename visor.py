@@ -51,6 +51,7 @@ class VisorInventario(tk.Tk):
             snapshot.RUTA_CONFIG_VISOR)
 
         self.title("Inventario de bodega - solo lectura")
+        self.iconbitmap("Inventario.ico")
         self.geometry("1040x680")
         self.minsize(880, 560)
         self.configure(bg=tema.FONDO)
